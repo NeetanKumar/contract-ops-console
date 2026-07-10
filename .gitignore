@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Planning inputs, not app deliverables
+/Full-Stack Engineering Assignment 2026.pdf
+/contract_ops_console_build_prompt_3.md
+
+backend/prisma/dev.db
