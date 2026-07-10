@@ -155,3 +155,21 @@ AWS, per the assignment's cloud-hosting requirement._
 | GET | `/api/contracts/:id/events` | Audit trail, oldest first |
 
 All `/api/contracts*` routes require an `X-Org-Id` header (or `org_id` query param).
+
+## Bonus: backend API tests
+
+`backend/tests/` has a Vitest + Supertest suite (13 tests) covering org scoping/cross-org
+`404`s, JSON schema validation errors, the full `DRAFT→FINALIZED→ARCHIVED` state machine
+and its `409`s, audit trail ordering/diffing, delete semantics, and search/filter/
+pagination. Vitest was used instead of Jest — this backend is ESM (`"type": "module"`)
+and Vitest needs no extra ESM/TS transform config, while Jest does.
+
+```bash
+cd backend
+createdb contract_ops_console_test   # one-time, separate from the dev DB
+cp .env.test.example .env.test       # edit DATABASE_URL to point at the test DB
+npm test
+```
+
+The suite applies migrations to the test database automatically and truncates all
+tables between tests — it never touches your dev database or its seeded data.
