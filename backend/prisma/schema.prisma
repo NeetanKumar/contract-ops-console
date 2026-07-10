@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContractStatus {
+  DRAFT
+  FINALIZED
+  ARCHIVED
+}
+
+enum ContractEventType {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  DELETED
+}
+
+model Organisation {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime   @default(now()) @map("created_at")
+  contracts Contract[]
+  events    ContractEvent[]
+
+  @@map("organisations")
+}
+
+model Contract {
+  id        String         @id @default(uuid()) @db.Uuid
+  orgId     String         @map("org_id") @db.Uuid
+  org       Organisation   @relation(fields: [orgId], references: [id])
+  clientName String        @map("client_name")
+  poRefNo   String         @map("po_ref_no")
+  poDate    DateTime       @map("po_date") @db.Date
+  status    ContractStatus @default(DRAFT)
+  fieldData Json           @map("field_data")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  events    ContractEvent[]
+
+  @@index([orgId, status])
+  @@index([orgId, clientName])
+  @@map("contracts")
+}
+
+model ContractEvent {
+  id         String            @id @default(uuid()) @db.Uuid
+  contractId String?           @map("contract_id") @db.Uuid
+  contract   Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  orgId      String            @map("org_id") @db.Uuid
+  org        Organisation      @relation(fields: [orgId], references: [id])
+  eventType  ContractEventType @map("event_type")
+  fromStatus ContractStatus?   @map("from_status")
+  toStatus   ContractStatus?   @map("to_status")
+  payload    Json?
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  @@index([contractId])
+  @@index([orgId])
+  @@map("contract_events")
+}
