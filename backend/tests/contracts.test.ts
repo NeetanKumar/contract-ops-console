@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { createOrg, validContractPayload } from "./helpers.js";
+import { deleteAttachmentObject } from "../src/lib/attachmentStorage.js";
 
 const app = createApp();
 
@@ -241,6 +242,7 @@ describe("search, filter, pagination", () => {
 
 describe("PDF attachment (bonus)", () => {
   const pdfBytes = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
+  const uploadedContractIds: string[] = [];
 
   async function createDraft(orgId: string) {
     const res = await request(app)
@@ -250,6 +252,14 @@ describe("PDF attachment (bonus)", () => {
     return res.body;
   }
 
+  // Tests hit the real S3 bucket (no isolated test bucket) — clean up whatever
+  // they uploaded so objects don't pile up across runs.
+  afterEach(async () => {
+    for (const id of uploadedContractIds.splice(0)) {
+      await deleteAttachmentObject(id).catch(() => {});
+    }
+  });
+
   it("uploads and downloads a PDF attachment byte-for-byte", async () => {
     const org = await createOrg("Org A");
     const contract = await createDraft(org.id);
@@ -258,6 +268,7 @@ describe("PDF attachment (bonus)", () => {
       .post(`/api/contracts/${contract.id}/attachment`)
       .set("X-Org-Id", org.id)
       .attach("file", pdfBytes, { filename: "po.pdf", contentType: "application/pdf" });
+    uploadedContractIds.push(contract.id);
     expect(upload.status).toBe(201);
     expect(upload.body.attachmentFilename).toBe("po.pdf");
 
@@ -289,6 +300,7 @@ describe("PDF attachment (bonus)", () => {
       .post(`/api/contracts/${contract.id}/attachment`)
       .set("X-Org-Id", orgA.id)
       .attach("file", pdfBytes, { filename: "po.pdf", contentType: "application/pdf" });
+    uploadedContractIds.push(contract.id);
 
     const crossOrgDownload = await request(app)
       .get(`/api/contracts/${contract.id}/attachment`)

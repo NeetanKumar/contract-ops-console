@@ -8,8 +8,14 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}@host.docker.internal:5432/contract_ops_console?schema=public
       PORT: 4000
       CORS_ORIGIN: http://localhost:8080
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Reuses your host AWS CLI credentials (`aws configure`) for S3 access —
+      # read-only, nothing is written back to it.
+      - ~/.aws:/root/.aws:ro
 
   frontend:
     build:

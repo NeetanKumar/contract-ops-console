@@ -1,10 +1,9 @@
-import { unlink } from "node:fs/promises";
 import { Prisma, ContractStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/AppError.js";
 import type { ContractInput } from "../validation/contractSchema.js";
 import { broadcastStatusChanged } from "../sse/sseManager.js";
-import { attachmentPath } from "../lib/attachmentStorage.js";
+import { deleteAttachmentObject } from "../lib/attachmentStorage.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -245,7 +244,7 @@ export async function deleteAttachment(orgId: string, id: string) {
     throw new AppError(404, "Contract not found");
   }
   if (existing.attachmentFilename) {
-    await unlink(attachmentPath(id)).catch(() => {});
+    await deleteAttachmentObject(id).catch(() => {});
   }
   return prisma.contract.update({
     where: { id },

@@ -3,7 +3,7 @@ import multer from "multer";
 import { contractSchema, formatFieldErrors } from "../validation/contractSchema.js";
 import { AppError } from "../lib/AppError.js";
 import * as contractService from "../services/contractService.js";
-import { UPLOADS_DIR, attachmentPath } from "../lib/attachmentStorage.js";
+import { uploadAttachment, getAttachmentStream } from "../lib/attachmentStorage.js";
 
 export const contractsRouter = Router();
 
@@ -19,10 +19,7 @@ async function verifyContractOwnership(
 }
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (req, _file, cb) => cb(null, `${req.params.id}.pdf`),
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype !== "application/pdf") {
@@ -106,6 +103,7 @@ contractsRouter.delete("/:id", async (req, res) => {
 });
 
 contractsRouter.post("/:id/attachment", verifyContractOwnership, uploadPdf, async (req, res) => {
+  await uploadAttachment(req.params.id, req.file!.buffer, req.file!.mimetype);
   const contract = await contractService.saveAttachment(req.orgId!, req.params.id, req.file!);
   res.status(201).json(contract);
 });
@@ -117,7 +115,8 @@ contractsRouter.get("/:id/attachment", async (req, res) => {
   }
   res.setHeader("Content-Type", contract.attachmentMimeType ?? "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${contract.attachmentFilename}"`);
-  res.sendFile(attachmentPath(contract.id));
+  const stream = await getAttachmentStream(contract.id);
+  stream.pipe(res);
 });
 
 contractsRouter.delete("/:id/attachment", async (req, res) => {

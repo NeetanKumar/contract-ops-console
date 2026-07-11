@@ -97,6 +97,7 @@ No login wall — open it and pick an organisation from the dropdown. Seed data 
 | Backend | AWS Elastic Beanstalk (single instance, Docker platform) | Runs the same `backend/Dockerfile` used locally |
 | HTTPS for the backend | CloudFront (in front of the EB instance) | See below — EB's own domain is HTTP-only |
 | Database | AWS RDS for PostgreSQL | Private (not publicly accessible), reachable only from the backend's security group |
+| PDF attachment storage | AWS S3 | Private bucket, scoped IAM policy on the EB instance role (`GetObject`/`PutObject`/`DeleteObject` on `attachments/*` only) |
 
 **Why Elastic Beanstalk instead of App Runner**: App Runner was the original plan, but a
 brand-new AWS account needs an automatic AWS-side verification before App Runner (and
@@ -156,9 +157,13 @@ safety net.
   attachment (e.g. the original signed PO) is supplementary reference material, not part
   of the versioned JSON payload the status workflow governs. Uploading/deleting one does
   not write a `contract_events` row — the audit trail is scoped to the contract's actual
-  data and lifecycle, not its file attachments. Stored on local disk
-  (`backend/uploads/<contract-id>.pdf`, metadata only in Postgres) — see known limitations
-  below for why that's fine here but wouldn't be in a real multi-instance deployment.
+  data and lifecycle, not its file attachments. File bytes are stored in **S3**
+  (`s3://<S3_BUCKET_NAME>/attachments/<contract-id>.pdf`), with only metadata
+  (filename, size, mime type, uploaded-at) in Postgres — see
+  `backend/src/lib/attachmentStorage.ts`. This started as local disk storage during
+  initial development and was migrated to S3 once actually deployed, since local disk on
+  a single EC2 instance isn't durable (a platform update or instance replacement would
+  silently lose every uploaded file, while the DB metadata would still claim they exist).
 - **Upload page UX**: the upload flow is a single paste/upload-JSON textarea (not a
   manually-built form with one input per field), matching the "paste/upload JSON" wording
   in the spec. Field-level validation errors returned by the server are rendered as a
@@ -181,10 +186,9 @@ safety net.
   - Search is a single combined box that treats input matching a UUID shape as a
     contract-id lookup and anything else as a client-name partial match, rather than two
     separate inputs.
-  - PDF attachments live on local disk, not object storage. Fine for this assignment's
-    single-instance deployment target; a real production deployment on ephemeral compute
-    (e.g. containers that get replaced on every deploy) would need S3 (or equivalent)
-    instead, or the files would be lost on restart.
+  - (Resolved) PDF attachments were originally on local disk; migrated to S3 once the
+    app was actually deployed, since local disk on the single EC2 instance isn't durable
+    across platform updates/instance replacement.
 
 ## API reference (summary)
 
@@ -224,13 +228,14 @@ cross-org 404, delete). Vitest was used instead of Jest — this backend is ESM
 ```bash
 cd backend
 createdb contract_ops_console_test   # one-time, separate from the dev DB
-cp .env.test.example .env.test       # edit DATABASE_URL to point at the test DB
+cp .env.test.example .env.test       # edit DATABASE_URL and S3_BUCKET_NAME
 npm test
 ```
 
-The suite applies migrations to the test database automatically, truncates all tables
-between tests, and writes any test PDF uploads to a throwaway temp directory (not your
-real `backend/uploads/`) — it never touches your dev database, seeded data, or files.
+The suite applies migrations to the test database automatically and truncates all tables
+between tests — it never touches your dev database or seeded data. The attachment tests
+exercise the real S3 bucket (needs AWS credentials available locally, e.g. via
+`aws configure`) but clean up every object they create afterward.
 
 ### OpenAPI / Swagger docs
 
@@ -254,10 +259,11 @@ frontend: Vite build → nginx static serve with SPA fallback), plus a root
 `docker-compose.yml` that builds and runs both, wired together, in one command. The
 database is intentionally **not** containerized (per this project's setup, it uses your
 existing local Postgres instance directly) — `docker-compose.yml` reaches it via
-`host.docker.internal`.
+`host.docker.internal`. PDF attachments go to S3, so the backend container mounts your
+host's `~/.aws` credentials (read-only) to use whatever `aws configure` has set up.
 
 ```bash
-cp .env.example .env   # set POSTGRES_USER to your local Postgres role (usually your OS username)
+cp .env.example .env   # set POSTGRES_USER, S3_BUCKET_NAME (and AWS_REGION if not us-east-1)
 docker compose up --build
 # frontend: http://localhost:8080   backend: http://localhost:4000
 ```

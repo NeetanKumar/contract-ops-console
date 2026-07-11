@@ -1,13 +1,34 @@
-import { mkdirSync } from "node:fs";
-import path from "node:path";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import type { Readable } from "node:stream";
 
-// Overridable so the test suite can point this at a throwaway directory
-// instead of writing real files into the dev/prod uploads folder.
-export const UPLOADS_DIR = process.env.UPLOADS_DIR
-  ? path.resolve(process.env.UPLOADS_DIR)
-  : path.resolve(process.cwd(), "uploads");
-mkdirSync(UPLOADS_DIR, { recursive: true });
+const BUCKET = process.env.S3_BUCKET_NAME;
+if (!BUCKET) {
+  throw new Error("S3_BUCKET_NAME environment variable is required");
+}
 
-export function attachmentPath(contractId: string): string {
-  return path.join(UPLOADS_DIR, `${contractId}.pdf`);
+const s3 = new S3Client({});
+
+function attachmentKey(contractId: string): string {
+  return `attachments/${contractId}.pdf`;
+}
+
+export async function uploadAttachment(contractId: string, body: Buffer, contentType: string): Promise<void> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: attachmentKey(contractId),
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/** Returns a readable stream of the attachment body, for piping directly into an HTTP response. */
+export async function getAttachmentStream(contractId: string): Promise<Readable> {
+  const result = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: attachmentKey(contractId) }));
+  return result.Body as Readable;
+}
+
+export async function deleteAttachmentObject(contractId: string): Promise<void> {
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: attachmentKey(contractId) }));
 }
