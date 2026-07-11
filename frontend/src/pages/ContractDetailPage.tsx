@@ -12,6 +12,22 @@ function emptyItem(): LineItem {
   return { description: "", quantity: 1, unit_price: 0 };
 }
 
+function PaperclipIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className ?? "h-4 w-4"}
+    >
+      <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.19 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
+
 export function ContractDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { selectedOrgId } = useOrg();
@@ -314,44 +330,59 @@ export function ContractDetailPage() {
       )}
 
       <div className="mb-8 rounded-md border border-gray-200 bg-white p-4">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Attachment</h2>
+        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+          <PaperclipIcon />
+          Attachment
+        </h2>
         {contract.attachmentFilename ? (
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm">
             <a
               href={api.attachmentUrl(selectedOrgId!, contract.id)}
               target="_blank"
               rel="noreferrer"
-              className="text-blue-600 hover:underline"
+              className="flex items-center gap-2 font-medium text-blue-700 hover:underline"
             >
+              <PaperclipIcon />
               {contract.attachmentFilename}
               {contract.attachmentSize != null && (
-                <span className="ml-1 text-gray-400">({Math.round(contract.attachmentSize / 1024)} KB)</span>
+                <span className="font-normal text-blue-400">
+                  ({Math.round(contract.attachmentSize / 1024)} KB)
+                </span>
               )}
             </a>
             <button
               onClick={() => deleteAttachmentMutation.mutate()}
               disabled={deleteAttachmentMutation.isPending}
-              className="text-xs text-red-600 disabled:opacity-40"
+              className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
             >
               Remove
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <label
+            className={`flex cursor-pointer flex-col items-center gap-1 rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors ${
+              uploadAttachmentMutation.isPending
+                ? "border-gray-200 bg-gray-50"
+                : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+            }`}
+          >
             <input
               type="file"
               accept="application/pdf"
+              disabled={uploadAttachmentMutation.isPending}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) uploadAttachmentMutation.mutate(file);
                 e.target.value = "";
               }}
-              className="text-sm"
+              className="hidden"
             />
-            {uploadAttachmentMutation.isPending && (
-              <span className="text-xs text-gray-500">Uploading…</span>
-            )}
-          </div>
+            <PaperclipIcon className="h-5 w-5 text-gray-400" />
+            <span className="text-sm font-medium text-gray-700">
+              {uploadAttachmentMutation.isPending ? "Uploading…" : "Click to upload a PDF"}
+            </span>
+            <span className="text-xs text-gray-400">Optional — PDF only, up to 10MB</span>
+          </label>
         )}
       </div>
 
