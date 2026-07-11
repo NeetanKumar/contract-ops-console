@@ -238,3 +238,81 @@ describe("search, filter, pagination", () => {
     expect(page2.body.contracts).toHaveLength(1);
   });
 });
+
+describe("PDF attachment (bonus)", () => {
+  const pdfBytes = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
+
+  async function createDraft(orgId: string) {
+    const res = await request(app)
+      .post("/api/contracts")
+      .set("X-Org-Id", orgId)
+      .send(validContractPayload());
+    return res.body;
+  }
+
+  it("uploads and downloads a PDF attachment byte-for-byte", async () => {
+    const org = await createOrg("Org A");
+    const contract = await createDraft(org.id);
+
+    const upload = await request(app)
+      .post(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id)
+      .attach("file", pdfBytes, { filename: "po.pdf", contentType: "application/pdf" });
+    expect(upload.status).toBe(201);
+    expect(upload.body.attachmentFilename).toBe("po.pdf");
+
+    const download = await request(app)
+      .get(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id);
+    expect(download.status).toBe(200);
+    expect(download.headers["content-type"]).toContain("application/pdf");
+    expect(Buffer.compare(download.body, pdfBytes)).toBe(0);
+  });
+
+  it("rejects non-PDF uploads", async () => {
+    const org = await createOrg("Org A");
+    const contract = await createDraft(org.id);
+
+    const upload = await request(app)
+      .post(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id)
+      .attach("file", Buffer.from("not a pdf"), { filename: "note.txt", contentType: "text/plain" });
+    expect(upload.status).toBe(400);
+  });
+
+  it("404s when a different org tries to fetch the attachment", async () => {
+    const orgA = await createOrg("Org A");
+    const orgB = await createOrg("Org B");
+    const contract = await createDraft(orgA.id);
+
+    await request(app)
+      .post(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", orgA.id)
+      .attach("file", pdfBytes, { filename: "po.pdf", contentType: "application/pdf" });
+
+    const crossOrgDownload = await request(app)
+      .get(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", orgB.id);
+    expect(crossOrgDownload.status).toBe(404);
+  });
+
+  it("deletes an attachment, after which download 404s", async () => {
+    const org = await createOrg("Org A");
+    const contract = await createDraft(org.id);
+
+    await request(app)
+      .post(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id)
+      .attach("file", pdfBytes, { filename: "po.pdf", contentType: "application/pdf" });
+
+    const del = await request(app)
+      .delete(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id);
+    expect(del.status).toBe(204);
+
+    const download = await request(app)
+      .get(`/api/contracts/${contract.id}/attachment`)
+      .set("X-Org-Id", org.id);
+    expect(download.status).toBe(404);
+  });
+});

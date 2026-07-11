@@ -4,3 +4,6 @@ node_modules
 .env.test
 
 /generated/prisma
+
+# Local PDF attachment storage — see src/lib/attachmentStorage.ts
+/uploads

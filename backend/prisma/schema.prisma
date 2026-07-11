@@ -43,6 +43,13 @@ model Contract {
   updatedAt DateTime       @updatedAt @map("updated_at")
   events    ContractEvent[]
 
+  // Bonus: optional PDF attachment (e.g. the original signed PO). Stored on local
+  // disk (see src/lib/attachmentStorage.ts); these columns are just metadata.
+  attachmentFilename   String?   @map("attachment_filename")
+  attachmentMimeType   String?   @map("attachment_mime_type")
+  attachmentSize       Int?      @map("attachment_size")
+  attachmentUploadedAt DateTime? @map("attachment_uploaded_at")
+
   @@index([orgId, status])
   @@index([orgId, clientName])
   @@map("contracts")

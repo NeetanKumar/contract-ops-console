@@ -90,6 +90,24 @@ export function ContractDetailPage() {
     onError: (err) => showToast(err instanceof ApiError ? err.message : "Failed to delete"),
   });
 
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: (file: File) => api.uploadAttachment(selectedOrgId!, id!, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract", id] });
+      showToast("Attachment uploaded");
+    },
+    onError: (err) => showToast(err instanceof ApiError ? err.message : "Failed to upload attachment"),
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: () => api.deleteAttachment(selectedOrgId!, id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract", id] });
+      showToast("Attachment removed");
+    },
+    onError: (err) => showToast(err instanceof ApiError ? err.message : "Failed to remove attachment"),
+  });
+
   if (contractQuery.isLoading) return <p className="p-6 text-sm text-gray-500">Loading…</p>;
   if (contractQuery.isError || !contract) {
     return <p className="p-6 text-sm text-red-600">Contract not found.</p>;
@@ -294,6 +312,48 @@ export function ContractDetailPage() {
           )}
         </div>
       )}
+
+      <div className="mb-8 rounded-md border border-gray-200 bg-white p-4">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Attachment</h2>
+        {contract.attachmentFilename ? (
+          <div className="flex items-center justify-between text-sm">
+            <a
+              href={api.attachmentUrl(selectedOrgId!, contract.id)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {contract.attachmentFilename}
+              {contract.attachmentSize != null && (
+                <span className="ml-1 text-gray-400">({Math.round(contract.attachmentSize / 1024)} KB)</span>
+              )}
+            </a>
+            <button
+              onClick={() => deleteAttachmentMutation.mutate()}
+              disabled={deleteAttachmentMutation.isPending}
+              className="text-xs text-red-600 disabled:opacity-40"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadAttachmentMutation.mutate(file);
+                e.target.value = "";
+              }}
+              className="text-sm"
+            />
+            {uploadAttachmentMutation.isPending && (
+              <span className="text-xs text-gray-500">Uploading…</span>
+            )}
+          </div>
+        )}
+      </div>
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-gray-700">Audit trail</h2>

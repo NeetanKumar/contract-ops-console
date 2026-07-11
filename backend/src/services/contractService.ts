@@ -1,8 +1,10 @@
+import { unlink } from "node:fs/promises";
 import { Prisma, ContractStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/AppError.js";
 import type { ContractInput } from "../validation/contractSchema.js";
 import { broadcastStatusChanged } from "../sse/sseManager.js";
+import { attachmentPath } from "../lib/attachmentStorage.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -214,5 +216,44 @@ export async function getContractEvents(orgId: string, id: string) {
   return prisma.contractEvent.findMany({
     where: { contractId: id },
     orderBy: { createdAt: "asc" },
+  });
+}
+
+type AttachmentFile = { originalname: string; mimetype: string; size: number };
+
+/** Attachments are supplementary reference documents (e.g. the signed PO), not part
+ * of the versioned contract JSON — allowed regardless of status, and not audited. */
+export async function saveAttachment(orgId: string, id: string, file: AttachmentFile) {
+  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
+  if (!existing) {
+    throw new AppError(404, "Contract not found");
+  }
+  return prisma.contract.update({
+    where: { id },
+    data: {
+      attachmentFilename: file.originalname,
+      attachmentMimeType: file.mimetype,
+      attachmentSize: file.size,
+      attachmentUploadedAt: new Date(),
+    },
+  });
+}
+
+export async function deleteAttachment(orgId: string, id: string) {
+  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
+  if (!existing) {
+    throw new AppError(404, "Contract not found");
+  }
+  if (existing.attachmentFilename) {
+    await unlink(attachmentPath(id)).catch(() => {});
+  }
+  return prisma.contract.update({
+    where: { id },
+    data: {
+      attachmentFilename: null,
+      attachmentMimeType: null,
+      attachmentSize: null,
+      attachmentUploadedAt: null,
+    },
   });
 }

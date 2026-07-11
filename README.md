@@ -47,6 +47,9 @@ npm run dev                 # http://localhost:5173
 
 Open the frontend URL, pick an organisation from the dropdown in the top bar, and go.
 
+**Alternative: Docker Compose**, if you'd rather not install Node locally — see "Bonus
+features → Docker / docker-compose" below for the one-command version.
+
 ## Environment variables
 
 ### `backend/.env`
@@ -116,6 +119,13 @@ AWS, per the assignment's cloud-hosting requirement._
   intentional (per the given schema) — indexed columns make `status`/`client_name`
   filtering fast, while `field_data` preserves the full original payload for exact
   round-tripping back to the client.
+- **PDF attachments (bonus)**: allowed on a contract regardless of its status, since an
+  attachment (e.g. the original signed PO) is supplementary reference material, not part
+  of the versioned JSON payload the status workflow governs. Uploading/deleting one does
+  not write a `contract_events` row — the audit trail is scoped to the contract's actual
+  data and lifecycle, not its file attachments. Stored on local disk
+  (`backend/uploads/<contract-id>.pdf`, metadata only in Postgres) — see known limitations
+  below for why that's fine here but wouldn't be in a real multi-instance deployment.
 - **Upload page UX**: the upload flow is a single paste/upload-JSON textarea (not a
   manually-built form with one input per field), matching the "paste/upload JSON" wording
   in the spec. Field-level validation errors returned by the server are rendered as a
@@ -138,6 +148,10 @@ AWS, per the assignment's cloud-hosting requirement._
   - Search is a single combined box that treats input matching a UUID shape as a
     contract-id lookup and anything else as a client-name partial match, rather than two
     separate inputs.
+  - PDF attachments live on local disk, not object storage. Fine for this assignment's
+    single-instance deployment target; a real production deployment on ephemeral compute
+    (e.g. containers that get replaced on every deploy) would need S3 (or equivalent)
+    instead, or the files would be lost on restart.
 
 ## API reference (summary)
 
@@ -153,16 +167,26 @@ AWS, per the assignment's cloud-hosting requirement._
 | POST | `/api/contracts/:id/archive` | `FINALIZED → ARCHIVED` — `409` otherwise |
 | DELETE | `/api/contracts/:id` | `409` unless `DRAFT` |
 | GET | `/api/contracts/:id/events` | Audit trail, oldest first |
+| POST | `/api/contracts/:id/attachment` | Upload a PDF (multipart field `file`, any status) |
+| GET | `/api/contracts/:id/attachment` | Download the PDF |
+| DELETE | `/api/contracts/:id/attachment` | Remove the PDF |
 
 All `/api/contracts*` routes require an `X-Org-Id` header (or `org_id` query param).
+Full interactive documentation for every endpoint above is at `/api-docs` once the
+backend is running (see "Bonus: OpenAPI/Swagger docs" below).
 
-## Bonus: backend API tests
+## Bonus features
 
-`backend/tests/` has a Vitest + Supertest suite (13 tests) covering org scoping/cross-org
+All four suggested bonus items are implemented.
+
+### Backend API tests
+
+`backend/tests/` has a Vitest + Supertest suite (17 tests) covering org scoping/cross-org
 `404`s, JSON schema validation errors, the full `DRAFT→FINALIZED→ARCHIVED` state machine
-and its `409`s, audit trail ordering/diffing, delete semantics, and search/filter/
-pagination. Vitest was used instead of Jest — this backend is ESM (`"type": "module"`)
-and Vitest needs no extra ESM/TS transform config, while Jest does.
+and its `409`s, audit trail ordering/diffing, delete semantics, search/filter/pagination,
+and the PDF attachment endpoints (upload/download byte-for-byte, non-PDF rejection,
+cross-org 404, delete). Vitest was used instead of Jest — this backend is ESM
+(`"type": "module"`) and Vitest needs no extra ESM/TS transform config, while Jest does.
 
 ```bash
 cd backend
@@ -171,5 +195,41 @@ cp .env.test.example .env.test       # edit DATABASE_URL to point at the test DB
 npm test
 ```
 
-The suite applies migrations to the test database automatically and truncates all
-tables between tests — it never touches your dev database or its seeded data.
+The suite applies migrations to the test database automatically, truncates all tables
+between tests, and writes any test PDF uploads to a throwaway temp directory (not your
+real `backend/uploads/`) — it never touches your dev database, seeded data, or files.
+
+### OpenAPI / Swagger docs
+
+`backend/openapi.yaml` documents every endpoint (including the attachment ones). With the
+backend running, open **http://localhost:4000/api-docs** for interactive Swagger UI, or
+fetch the raw spec at `http://localhost:4000/openapi.yaml`.
+
+### PDF attachment upload
+
+Each contract can have one PDF attached (see the "Design decisions" section above for the
+rules). On the contract detail page, the Attachment card shows a file picker when there's
+no attachment, or the filename/size as a download link plus a Remove button once one
+exists. Enforced server-side: only `application/pdf` is accepted, max 10MB, and — like
+every other contract endpoint — a cross-org request 404s rather than ever touching another
+org's file.
+
+### Docker / docker-compose (one-command local setup)
+
+Both apps have a production-style multi-stage `Dockerfile` (backend: Node → slim runtime;
+frontend: Vite build → nginx static serve with SPA fallback), plus a root
+`docker-compose.yml` that builds and runs both, wired together, in one command. The
+database is intentionally **not** containerized (per this project's setup, it uses your
+existing local Postgres instance directly) — `docker-compose.yml` reaches it via
+`host.docker.internal`.
+
+```bash
+cp .env.example .env   # set POSTGRES_USER to your local Postgres role (usually your OS username)
+docker compose up --build
+# frontend: http://localhost:8080   backend: http://localhost:4000
+```
+
+Everything above was actually built and run locally (not just written) to confirm it
+works: both Dockerfiles build clean, the compose stack was brought up and smoke-tested
+end-to-end against the real local Postgres instance, and the frontend container was
+verified in a real browser talking to the backend container with zero console errors.

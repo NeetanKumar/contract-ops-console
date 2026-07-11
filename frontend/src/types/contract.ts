@@ -28,6 +28,10 @@ export type Contract = {
   fieldData: ContractFieldData;
   createdAt: string;
   updatedAt: string;
+  attachmentFilename: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
+  attachmentUploadedAt: string | null;
 };
 
 export type ContractEventType = "CREATED" | "UPDATED" | "STATUS_CHANGED" | "DELETED";

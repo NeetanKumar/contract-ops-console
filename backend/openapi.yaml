@@ -1,0 +1,331 @@
+openapi: 3.0.3
+info:
+  title: Contract Operations Console API
+  version: "1.0.0"
+  description: |
+    Org-scoped contract lifecycle API: upload structured contract JSON, track it through
+    DRAFT → FINALIZED → ARCHIVED, search/filter/paginate, and stream real-time status
+    changes over SSE. Every `/api/contracts*` endpoint requires an `X-Org-Id` header
+    identifying the organisation to scope the request to.
+servers:
+  - url: http://localhost:4000
+    description: Local development
+
+components:
+  securitySchemes:
+    OrgId:
+      type: apiKey
+      in: header
+      name: X-Org-Id
+      description: UUID of the organisation this request is scoped to.
+
+  schemas:
+    Organisation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    LineItem:
+      type: object
+      required: [description, quantity, unit_price]
+      properties:
+        description: { type: string }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        quantity_unit: { type: string }
+        unit_price: { type: number, minimum: 0 }
+        pricing_unit: { type: string }
+        total: { type: number }
+
+    ContractInput:
+      type: object
+      required: [client_name, po_ref_no, po_date, items]
+      properties:
+        client_name: { type: string }
+        po_ref_no: { type: string }
+        po_date: { type: string, format: date, description: "YYYY-MM-DD" }
+        payment_terms: { type: string }
+        delivery_terms: { type: string }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/LineItem" }
+
+    Contract:
+      allOf:
+        - $ref: "#/components/schemas/ContractInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            orgId: { type: string, format: uuid }
+            clientName: { type: string }
+            poRefNo: { type: string }
+            poDate: { type: string, format: date-time }
+            status: { type: string, enum: [DRAFT, FINALIZED, ARCHIVED] }
+            fieldData: { type: object }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+            attachmentFilename: { type: string, nullable: true }
+            attachmentMimeType: { type: string, nullable: true }
+            attachmentSize: { type: integer, nullable: true }
+            attachmentUploadedAt: { type: string, format: date-time, nullable: true }
+
+    ContractEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        contractId: { type: string, format: uuid, nullable: true }
+        orgId: { type: string, format: uuid }
+        eventType: { type: string, enum: [CREATED, UPDATED, STATUS_CHANGED, DELETED] }
+        fromStatus: { type: string, enum: [DRAFT, FINALIZED, ARCHIVED], nullable: true }
+        toStatus: { type: string, enum: [DRAFT, FINALIZED, ARCHIVED], nullable: true }
+        payload: { type: object, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    ContractList:
+      type: object
+      properties:
+        contracts:
+          type: array
+          items: { $ref: "#/components/schemas/Contract" }
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        fieldErrors:
+          type: object
+          additionalProperties: { type: string }
+          description: Present on 400 validation failures, keyed by field path (e.g. `items[0].quantity`).
+
+  responses:
+    NotFound:
+      description: Not found (also returned for a contract that exists but belongs to a different org — never 403, to avoid leaking existence)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Invalid state transition for the contract's current status
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Schema validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+security:
+  - OrgId: []
+
+paths:
+  /api/organisations:
+    get:
+      summary: List organisations (for the org-selector dropdown)
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisations:
+                    type: array
+                    items: { $ref: "#/components/schemas/Organisation" }
+
+  /api/organisations/{orgId}/events/stream:
+    get:
+      summary: SSE stream of contract status-change events for this org
+      security: []
+      description: |
+        Long-lived `text/event-stream` connection. Sends a `: heartbeat` comment every
+        ~20s, and an `event: contract_status_changed` message
+        (`data: { contract_id, from_status, to_status }`) whenever a contract in this org
+        is finalized or archived. Intended for the native `EventSource` API.
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: text/event-stream connection opened
+
+  /api/contracts:
+    post:
+      summary: Create a contract (starts as DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContractInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+    get:
+      summary: List/search/filter/paginate contracts in the selected org
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [DRAFT, FINALIZED, ARCHIVED] }
+        - name: client_name
+          in: query
+          description: Partial, case-insensitive match
+          schema: { type: string }
+        - name: contract_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContractList" }
+
+  /api/contracts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Get contract detail
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Update a contract (DRAFT only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContractInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      summary: Delete a contract (DRAFT only)
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/contracts/{id}/finalize:
+    post:
+      summary: Transition DRAFT → FINALIZED
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/contracts/{id}/archive:
+    post:
+      summary: Transition FINALIZED → ARCHIVED
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/contracts/{id}/events:
+    get:
+      summary: Audit trail for a contract, oldest first
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/ContractEvent" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/contracts/{id}/attachment:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Upload a PDF attachment for a contract (bonus feature; any status)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Contract" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      summary: Download the contract's PDF attachment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Remove the contract's PDF attachment
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }

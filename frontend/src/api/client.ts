@@ -71,6 +71,27 @@ export const api = {
 
   deleteContract: (orgId: string, id: string) =>
     request<void>(`/api/contracts/${id}`, { orgId, method: "DELETE" }),
+
+  uploadAttachment: async (orgId: string, id: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/contracts/${id}/attachment`, {
+      method: "POST",
+      headers: { "X-Org-Id": orgId },
+      body: formData,
+    });
+    const data = await res.json().catch(() => undefined);
+    if (!res.ok) {
+      throw new ApiError(res.status, data?.error ?? "Upload failed", data?.fieldErrors);
+    }
+    return data as Contract;
+  },
+
+  attachmentUrl: (orgId: string, id: string) =>
+    `${API_URL}/api/contracts/${id}/attachment?org_id=${orgId}`,
+
+  deleteAttachment: (orgId: string, id: string) =>
+    request<void>(`/api/contracts/${id}/attachment`, { orgId, method: "DELETE" }),
 };
 
 export { API_URL };
