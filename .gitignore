@@ -11,3 +11,6 @@ build/
 /contract_ops_console_build_prompt_3.md
 
 backend/prisma/dev.db
+
+# Deployment secrets (RDS master password, etc.) — local only, never committed
+/.deploy-secrets

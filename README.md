@@ -84,8 +84,41 @@ See `backend/.env.example` and `frontend/.env.example` for copy-pasteable templa
 
 ## Deployed URL
 
-_TBD — see "Deployment" below; this section will be filled in once the app is deployed to
-AWS, per the assignment's cloud-hosting requirement._
+**App**: https://main.dswwc084lde8g.amplifyapp.com
+
+No login wall — open it and pick an organisation from the dropdown. Seed data (2 orgs,
+5 contracts) is already loaded.
+
+### Deployed architecture (AWS)
+
+| Piece | Service | Notes |
+|---|---|---|
+| Frontend | AWS Amplify Hosting | Static build, HTTPS by default |
+| Backend | AWS Elastic Beanstalk (single instance, Docker platform) | Runs the same `backend/Dockerfile` used locally |
+| HTTPS for the backend | CloudFront (in front of the EB instance) | See below — EB's own domain is HTTP-only |
+| Database | AWS RDS for PostgreSQL | Private (not publicly accessible), reachable only from the backend's security group |
+
+**Why Elastic Beanstalk instead of App Runner**: App Runner was the original plan, but a
+brand-new AWS account needs an automatic AWS-side verification before App Runner (and
+some other newer services) will accept requests — it returned
+`SubscriptionRequiredException` regardless of IAM permissions. Rather than wait an
+unknown number of hours, we switched to Elastic Beanstalk (single-instance, Docker
+platform), which was immediately available, deploys from the same Dockerfile already
+built and tested for the bonus Docker work, and — unlike App Runner — its EC2 instance is
+covered by the AWS Free Tier on a new account (App Runner has no free tier at all).
+
+**Why CloudFront is in the mix**: Elastic Beanstalk's single-instance mode has no load
+balancer, so there's nowhere to attach a TLS certificate — its default
+`*.elasticbeanstalk.com` domain is HTTP-only. Amplify Hosting is HTTPS-only, and browsers
+block "mixed content" (an HTTPS page calling an HTTP API) outright. A CloudFront
+distribution in front of the EB origin gets a free `*.cloudfront.net` HTTPS domain with
+no custom domain or ACM certificate needed, with caching disabled so it transparently
+proxies every request (including the SSE stream) straight through.
+
+**Cost**: RDS and the EB EC2 instance are both within the AWS Free Tier for a new
+account (750 hrs/month each, 12 months). CloudFront and Amplify are within their
+respective free tiers at this traffic level. A small AWS Budget alert is configured as a
+safety net.
 
 ## Design decisions & assumptions
 
