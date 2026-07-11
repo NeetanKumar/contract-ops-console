@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useOrg } from "../context/OrgContext";
 import { api } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
+import { PaperclipIcon } from "../components/PaperclipIcon";
 import type { ContractStatus } from "../types/contract";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -100,7 +101,17 @@ export function ContractListPage() {
               <tbody>
                 {data.contracts.map((contract) => (
                   <tr key={contract.id} className="border-t border-gray-100">
-                    <td className="px-4 py-2">{contract.clientName}</td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-1.5">
+                        {contract.clientName}
+                        {contract.attachmentFilename && (
+                          <PaperclipIcon
+                            className="h-3.5 w-3.5 shrink-0 text-gray-400"
+                            title={`Has attachment: ${contract.attachmentFilename}`}
+                          />
+                        )}
+                      </span>
+                    </td>
                     <td className="px-4 py-2">{contract.poRefNo}</td>
                     <td className="px-4 py-2">{contract.poDate.slice(0, 10)}</td>
                     <td className="px-4 py-2">

@@ -6,26 +6,11 @@ import { useToast } from "../context/ToastContext";
 import { api, ApiError } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { AuditTrail } from "../components/AuditTrail";
+import { PaperclipIcon } from "../components/PaperclipIcon";
 import type { ContractFieldData, FieldErrors, LineItem } from "../types/contract";
 
 function emptyItem(): LineItem {
   return { description: "", quantity: 1, unit_price: 0 };
-}
-
-function PaperclipIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className ?? "h-4 w-4"}
-    >
-      <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.19 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-    </svg>
-  );
 }
 
 export function ContractDetailPage() {
@@ -335,28 +320,56 @@ export function ContractDetailPage() {
           Attachment
         </h2>
         {contract.attachmentFilename ? (
-          <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm">
-            <a
-              href={api.attachmentUrl(selectedOrgId!, contract.id)}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 font-medium text-blue-700 hover:underline"
-            >
-              <PaperclipIcon />
-              {contract.attachmentFilename}
-              {contract.attachmentSize != null && (
-                <span className="font-normal text-blue-400">
-                  ({Math.round(contract.attachmentSize / 1024)} KB)
-                </span>
-              )}
-            </a>
-            <button
-              onClick={() => deleteAttachmentMutation.mutate()}
-              disabled={deleteAttachmentMutation.isPending}
-              className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
-            >
-              Remove
-            </button>
+          <div>
+            <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm">
+              <a
+                href={api.attachmentUrl(selectedOrgId!, contract.id)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 font-medium text-blue-700 hover:underline"
+              >
+                <PaperclipIcon />
+                {contract.attachmentFilename}
+                {contract.attachmentSize != null && (
+                  <span className="font-normal text-blue-400">
+                    ({Math.round(contract.attachmentSize / 1024)} KB)
+                  </span>
+                )}
+              </a>
+              <div className="flex items-center gap-1">
+                <label className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                  {uploadAttachmentMutation.isPending ? "Uploading…" : "Replace"}
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    disabled={uploadAttachmentMutation.isPending}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadAttachmentMutation.mutate(file);
+                      e.target.value = "";
+                    }}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  onClick={() => deleteAttachmentMutation.mutate()}
+                  disabled={deleteAttachmentMutation.isPending}
+                  className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            {contract.attachmentMimeType === "application/pdf" && (
+              <iframe
+                key={contract.attachmentUploadedAt}
+                src={`${api.attachmentUrl(selectedOrgId!, contract.id)}&t=${encodeURIComponent(
+                  contract.attachmentUploadedAt ?? "",
+                )}`}
+                title={`Preview of ${contract.attachmentFilename}`}
+                className="mt-3 h-[600px] w-full rounded-md border border-gray-200"
+              />
+            )}
           </div>
         ) : (
           <label
