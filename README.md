@@ -1,196 +1,265 @@
 # Contract Operations Console
 
-A full-stack contract lifecycle tool: upload structured contract JSON, track it through
-`DRAFT → FINALIZED → ARCHIVED`, search/filter/paginate, and watch status changes update
-live across browser tabs — all scoped to a selected organisation (multi-tenant, no login).
+Multi-tenant contract lifecycle tool: upload contract JSON, move it through
+`DRAFT → FINALIZED → ARCHIVED`, search/filter/paginate, and see status changes appear
+live in other open tabs — scoped to a selected organisation, no login required.
+
+**Live app**: https://main.dswwc084lde8g.amplifyapp.com
+**API docs (Swagger)**: https://d1gzd74qggmguf.cloudfront.net/api-docs
+**Repo**: this one. No access wall on either link — open and use directly.
+
+---
+
+## Requirements checklist
+
+Every bullet from the assignment brief, and where it's satisfied.
+
+**Frontend**
+| Requirement | Where |
+|---|---|
+| Select an organisation | Org dropdown, top-right nav (`OrgSelector.tsx`) |
+| Upload contract JSON with validation feedback | `/upload` — inline per-field errors from the server |
+| List contracts with status | `/` — table (desktop) / cards (mobile) |
+| Search/filter via backend API | Client name + contract ID search box, status filter — both sent as query params, not filtered client-side |
+| View details, edit drafts, save | `/contracts/:id` — edit only enabled while `DRAFT` |
+| Finalize / archive actions | Buttons shown only when valid for the current status |
+| Audit trail on detail page | Bottom of `/contracts/:id`, oldest first |
+| Real-time status updates across tabs | SSE + `EventSource`, live badge in the nav bar |
+
+**Backend**
+| Requirement | Where |
+|---|---|
+| Accept + validate contract JSON, store in Postgres | `POST /api/contracts`, Zod schema, field-level errors on `400` |
+| Org-scoped, no cross-org access | `X-Org-Id` header validated server-side on every request; cross-org contract access returns `404` |
+| Filter by status / client name (partial) / contract ID / pagination | `GET /api/contracts?status=&client_name=&contract_id=&page=&limit=` |
+| Update draft contracts only | `PUT /api/contracts/:id` → `409` unless `DRAFT` |
+| Enforce status workflow, reject invalid transitions | `409` on any transition other than `DRAFT→FINALIZED→ARCHIVED` |
+| Delete drafts only | `DELETE /api/contracts/:id` → `409` unless `DRAFT` |
+| Audit event per create/update/status-change/delete | `contract_events` table, written in the same transaction as each mutation |
+| Expose event history per contract | `GET /api/contracts/:id/events` |
+
+**Database**
+| Requirement | Where |
+|---|---|
+| Org-scoped, efficient filtering/querying | Composite indexes on `(org_id, status)` and `(org_id, client_name)` |
+| Contract payload as JSONB | `contracts.field_data` |
+| `contract_events` audit table | Present, FK to both `contracts` and `organisations` |
+| Real-time via WebSocket or SSE | SSE, native `EventSource`, no Socket.IO |
+
+**Deployment**
+| Requirement | Where |
+|---|---|
+| Deployed to AWS/Azure/GCP | AWS — see architecture table below |
+| GitHub repo | This one, public, incremental commit history |
+| README with setup/env vars/local dev/deployed URL | This file |
+
+**Seed data**: 2 organisations, 5 contracts spread across all three statuses (see below).
+
+---
 
 ## Tech stack
 
-- **Frontend**: React (Vite) + TypeScript + Tailwind CSS, React Router, TanStack React Query
-- **Backend**: Node.js + Express + TypeScript
-- **Database**: PostgreSQL via Prisma
-- **Real-time**: Server-Sent Events (native `EventSource`, no Socket.IO/WebSocket library)
+React (Vite) + TypeScript + Tailwind, Node.js + Express + TypeScript, PostgreSQL via
+Prisma, Server-Sent Events for real-time. All mandated by the assignment; no substitutions.
 
 ## Repository layout
 
 ```
-backend/    Express API, Prisma schema + migrations, seed script
+backend/    Express API, Prisma schema + migrations, seed script, Vitest suite
 frontend/   Vite React SPA
+examples/   Sample contract JSON for manually testing the upload flow
 ```
+
+---
 
 ## Setup
 
 ### Prerequisites
-
 - Node.js 20+ and npm
 - A running PostgreSQL instance (local or hosted)
 
 ### Backend
-
 ```bash
 cd backend
 npm install
-cp .env.example .env        # then edit DATABASE_URL to point at your Postgres instance
+cp .env.example .env        # edit DATABASE_URL to point at your Postgres instance
 npx prisma migrate dev      # creates the schema
 npm run seed                # seeds 2 orgs / 5 contracts
 npm run dev                 # http://localhost:4000
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
 npm install
-cp .env.example .env        # defaults to http://localhost:4000, edit if your API differs
+cp .env.example .env        # defaults to http://localhost:4000
 npm run dev                 # http://localhost:5173
 ```
 
-Open the frontend URL, pick an organisation from the dropdown in the top bar, and go.
+Open the frontend URL, pick an organisation, and go.
 
-**Alternative: Docker Compose**, if you'd rather not install Node locally — see "Bonus
-features → Docker / docker-compose" below for the one-command version.
+**Docker alternative** — one command instead of the two above, if you'd rather not
+install Node locally:
+```bash
+cp .env.example .env   # set POSTGRES_USER, S3_BUCKET_NAME
+docker compose up --build
+# frontend: http://localhost:8080   backend: http://localhost:4000
+```
+Database stays on your host Postgres (not containerized); the backend container reaches
+it via `host.docker.internal` and reuses your `~/.aws` credentials for S3.
 
 ## Environment variables
 
-### `backend/.env`
+**`backend/.env`**
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `PORT` | API port (default `4000`) |
+| `CORS_ORIGIN` | Allowed frontend origin(s), comma-separated |
+| `S3_BUCKET_NAME` | S3 bucket for PDF attachments |
+| `AWS_REGION` | Region for the S3 client |
 
-| Variable | Description | Example |
-|---|---|---|
-| `DATABASE_URL` | Postgres connection string | `postgresql://user@localhost:5432/contract_ops_console?schema=public` |
-| `PORT` | Port the API listens on | `4000` |
-| `CORS_ORIGIN` | Comma-separated list of allowed frontend origins | `http://localhost:5173` |
+**`frontend/.env`**
+| Variable | Description |
+|---|---|
+| `VITE_API_URL` | Backend API base URL |
 
-### `frontend/.env`
-
-| Variable | Description | Example |
-|---|---|---|
-| `VITE_API_URL` | Base URL of the backend API | `http://localhost:4000` |
-
-See `backend/.env.example` and `frontend/.env.example` for copy-pasteable templates.
+Templates: `backend/.env.example`, `frontend/.env.example`.
 
 ## Local development guide
 
-- **Migrations**: `cd backend && npx prisma migrate dev` (creates a new migration from
-  schema changes and applies it). `npx prisma migrate deploy` applies existing migrations
-  without generating new ones (used in production).
-- **Seed data**: `cd backend && npm run seed`. Re-running it wipes and recreates the 2
-  organisations / 5 contracts (safe to re-run any time during development).
-- **Running both servers**: backend on `:4000`, frontend on `:5173`, each via `npm run dev`
-  in its own terminal.
-- **Testing real-time updates**: open the app in two browser tabs on the same
-  organisation, finalize or archive a contract in one tab, and watch the other tab's list
-  (and detail page, if open on that contract) update without a manual refresh. The header
-  shows a Live/Reconnecting indicator for the SSE connection state.
+- **Migrations**: `npx prisma migrate dev` (new migration + apply). `npx prisma migrate deploy` applies existing migrations without generating new ones — what production uses.
+- **Seed data**: `npm run seed`, safe to re-run any time (wipes and recreates).
+- **Both servers**: backend `:4000`, frontend `:5173`, each `npm run dev` in its own terminal.
+- **Testing real-time**: open the app in two tabs on the same org, finalize/archive in one, watch the other update without a refresh. Nav bar shows Live/Reconnecting for the SSE connection.
+- **Sample data**: `examples/sample-contract.json` for testing the upload flow.
 
-## Deployed URL
+---
 
-**App**: https://main.dswwc084lde8g.amplifyapp.com
+## Deployed architecture (AWS)
 
-No login wall — open it and pick an organisation from the dropdown. Seed data (2 orgs,
-5 contracts) is already loaded.
-
-### Deployed architecture (AWS)
-
-| Piece | Service | Notes |
+| Piece | Service | Why |
 |---|---|---|
-| Frontend | AWS Amplify Hosting | Static build, HTTPS by default |
-| Backend | AWS Elastic Beanstalk (single instance, Docker platform) | Runs the same `backend/Dockerfile` used locally |
-| HTTPS for the backend | CloudFront (in front of the EB instance) | See below — EB's own domain is HTTP-only |
-| Database | AWS RDS for PostgreSQL | Private (not publicly accessible), reachable only from the backend's security group |
-| PDF attachment storage | AWS S3 | Private bucket, scoped IAM policy on the EB instance role (`GetObject`/`PutObject`/`DeleteObject` on `attachments/*` only) |
+| Frontend | Amplify Hosting | Static build, HTTPS by default, free tier covers this easily |
+| Backend | Elastic Beanstalk, single instance, Docker platform | Runs the same `backend/Dockerfile` used locally; EC2 instance covered by AWS Free Tier |
+| HTTPS for the backend | CloudFront in front of the EB instance | EB's own domain is HTTP-only with no load balancer to attach a cert to; Amplify is HTTPS-only and browsers block mixed content outright. CloudFront gives a free `*.cloudfront.net` HTTPS domain, caching disabled so it passes through the SSE stream untouched |
+| Database | RDS for PostgreSQL | Not publicly accessible; reachable only from the backend's security group |
+| PDF attachments | S3 | Private bucket, IAM policy scoped to `GetObject`/`PutObject`/`DeleteObject` on `attachments/*` only |
 
-**Why Elastic Beanstalk instead of App Runner**: App Runner was the original plan, but a
-brand-new AWS account needs an automatic AWS-side verification before App Runner (and
-some other newer services) will accept requests — it returned
-`SubscriptionRequiredException` regardless of IAM permissions. Rather than wait an
-unknown number of hours, we switched to Elastic Beanstalk (single-instance, Docker
-platform), which was immediately available, deploys from the same Dockerfile already
-built and tested for the bonus Docker work, and — unlike App Runner — its EC2 instance is
-covered by the AWS Free Tier on a new account (App Runner has no free tier at all).
+App Runner was the original plan for the backend, but a brand-new AWS account needs an
+automatic AWS-side verification before App Runner accepts any request — switched to
+Elastic Beanstalk instead, which was immediately available, deploys from the same
+Dockerfile, and is free-tier eligible (App Runner isn't).
 
-**Why CloudFront is in the mix**: Elastic Beanstalk's single-instance mode has no load
-balancer, so there's nowhere to attach a TLS certificate — its default
-`*.elasticbeanstalk.com` domain is HTTP-only. Amplify Hosting is HTTPS-only, and browsers
-block "mixed content" (an HTTPS page calling an HTTP API) outright. A CloudFront
-distribution in front of the EB origin gets a free `*.cloudfront.net` HTTPS domain with
-no custom domain or ACM certificate needed, with caching disabled so it transparently
-proxies every request (including the SSE stream) straight through.
+Cost at this traffic level: effectively $0 — RDS and the EB instance are within the
+12-month Free Tier, CloudFront/Amplify are within their own free tiers. An AWS Budget
+alert is configured as a safety net.
 
-**Cost**: RDS and the EB EC2 instance are both within the AWS Free Tier for a new
-account (750 hrs/month each, 12 months). CloudFront and Amplify are within their
-respective free tiers at this traffic level. A small AWS Budget alert is configured as a
-safety net.
+---
 
-## Design decisions & assumptions
+## Notable design decisions
 
-- **Why this stack**: React+Vite / Express / Postgres+Prisma is the assignment's
-  mandated stack. Prisma was chosen over Drizzle for its migration CLI and more mature
-  JSONB/enum ergonomics under a tight timeline. Prisma is pinned to v6 and TypeScript to
-  v5 throughout (backend and frontend) — both had just-released major versions (Prisma 7,
-  TypeScript 7) available at install time with unfamiliar/unverified behavior, and v6/v5
-  are the well-established, fully-documented lines.
-- **Org-scoping without full auth**: the frontend sends the selected org as an
-  `X-Org-Id` header on every request. The backend never trusts it blindly — a middleware
-  (`backend/src/middleware/orgScope.ts`) validates it's a real organisation UUID before
-  any request proceeds, and every contract query is additionally filtered by that org id
-  at the database level. Requests for a contract that exists but belongs to a different
-  org return `404` (not `403`), so org existence/ownership can't be probed from outside.
-- **Status workflow enforcement**: `DRAFT → FINALIZED → ARCHIVED` is a strict, one-way
-  state machine (`backend/src/services/contractService.ts`). Finalize/Archive/Update/
-  Delete each assert the contract's current status server-side before acting and return
-  `409` on any invalid transition — the frontend only *shows* the relevant action buttons
-  for the current status as a UX nicety, it isn't the source of truth.
-- **Audit trail & delete semantics**: every create/update/status-change/delete writes a
-  row to `contract_events`. Deleting a `DRAFT` contract is a genuine hard delete (there's
-  no soft-delete flag in the schema), but the `DELETED` audit event is written *before*
-  the delete and is designed to survive it: `contract_events.contract_id` uses
-  `onDelete: SetNull` rather than cascade, so the event becomes a permanent,
-  org-scoped ledger entry even though the contract it once pointed to is gone. (The
-  per-contract `GET /:id/events` endpoint naturally 404s afterward, since the contract
-  itself no longer exists — there's no UI surface left to view that trail against.)
-- **Denormalized search columns**: `client_name`, `po_ref_no`, and `po_date` are stored
-  both as indexed columns on `contracts` and inside the `field_data` JSONB blob. This is
-  intentional (per the given schema) — indexed columns make `status`/`client_name`
-  filtering fast, while `field_data` preserves the full original payload for exact
-  round-tripping back to the client.
-- **PDF attachments (bonus)**: allowed on a contract regardless of its status, since an
-  attachment (e.g. the original signed PO) is supplementary reference material, not part
-  of the versioned JSON payload the status workflow governs. Uploading/deleting one does
-  not write a `contract_events` row — the audit trail is scoped to the contract's actual
-  data and lifecycle, not its file attachments. File bytes are stored in **S3**
-  (`s3://<S3_BUCKET_NAME>/attachments/<contract-id>.pdf`), with only metadata
-  (filename, size, mime type, uploaded-at) in Postgres — see
-  `backend/src/lib/attachmentStorage.ts`. This started as local disk storage during
-  initial development and was migrated to S3 once actually deployed, since local disk on
-  a single EC2 instance isn't durable (a platform update or instance replacement would
-  silently lose every uploaded file, while the DB metadata would still claim they exist).
-- **Upload page UX**: the upload flow is a single paste/upload-JSON textarea (not a
-  manually-built form with one input per field), matching the "paste/upload JSON" wording
-  in the spec. Field-level validation errors returned by the server are rendered as a
-  list of `field.path: message` under the textarea after submit, since validation is
-  authoritative server-side.
-- **Contract detail edit form**: DRAFT contracts get a structured edit form (not a raw
-  JSON textarea) generated from the parsed `field_data`, including add/remove for line
-  items, so edits stay schema-valid without needing to hand-edit JSON.
-- **"Delete draft" in the UI**: the assignment's frontend requirements list doesn't
-  explicitly mention a delete button, but the backend requires and implements
-  `DELETE /api/contracts/:id` (draft-only) as a priority-1 item. A small "Delete draft"
-  action was added to the detail page so that backend capability is reachable and
-  testable end-to-end, rather than leaving it as an API-only feature.
-- **Known limitations** (explicitly acceptable given the 1-week timeline):
-  - The SSE connection map is in-memory and per-process. This assignment runs a single
-    backend instance, so that's fine; a multi-instance production deployment would need
-    a shared pub/sub layer (e.g. Redis) to fan out events across instances.
-  - No authentication/authorization beyond org-scoping — anyone with the deployed URL and
-    a valid org id can access that org's data, by design of the assignment.
-  - Search is a single combined box that treats input matching a UUID shape as a
-    contract-id lookup and anything else as a client-name partial match, rather than two
-    separate inputs.
-  - (Resolved) PDF attachments were originally on local disk; migrated to S3 once the
-    app was actually deployed, since local disk on the single EC2 instance isn't durable
-    across platform updates/instance replacement.
+- **Org-scoping enforced server-side, not just in the UI.** `X-Org-Id` is validated
+  against real organisations before any request proceeds, and every query filters by it
+  at the database level. A request for another org's contract returns `404` (not `403`)
+  so existence can't be probed from outside.
+- **Status workflow is a strict one-way state machine enforced in the service layer.**
+  The frontend only shows relevant action buttons as a UX convenience — the backend is
+  the actual source of truth and rejects any invalid transition with `409` regardless of
+  what the client sends.
+- **Deleting a DRAFT contract is a real hard delete, but its audit event survives it.**
+  `contract_events.contract_id` uses `onDelete: SetNull` instead of cascade, so the
+  `DELETED` event remains as a permanent, org-scoped ledger row even after the contract
+  itself is gone.
+- **`client_name`/`po_ref_no`/`po_date` are stored both as indexed columns and inside the
+  JSONB payload** — indexed columns keep filtering fast, the JSONB blob preserves the
+  exact original payload for round-tripping.
+- **PDF attachments live in S3, not the database or local disk.** Only metadata
+  (filename, size, mime type, timestamp) is in Postgres. This was originally local disk
+  during development and migrated to S3 once actually deployed, since local disk on a
+  single EC2 instance isn't durable across a platform update or instance replacement —
+  the file would silently disappear while the database still claimed it existed.
+- **A `Delete draft` button exists in the UI** even though the assignment's frontend
+  bullet list doesn't explicitly call for it — the backend requires it as a priority-1
+  item, so it's surfaced rather than left as an API-only capability nobody can reach.
 
-## API reference (summary)
+## Known limitations
+
+- SSE connections are tracked in-memory, per backend process. Fine for the single
+  instance this runs on; a multi-instance deployment would need a shared pub/sub (e.g.
+  Redis) to fan out events across instances — see Scalability below.
+- No authentication beyond org-scoping, by design of the assignment — anyone with the
+  URL and a valid org id can access that org's data.
+- Search is one combined box: input shaped like a UUID is treated as a contract-ID
+  lookup, anything else as a client-name partial match.
+
+---
+
+## Scope for scalability: getting to millions
+
+Everything above is sized for a take-home assignment (a handful of orgs, a handful of
+contracts each). Here's what would actually change to handle millions of contracts and
+concurrent users — not hypothetical, specific to this codebase:
+
+**Database**
+- **Cursor-based pagination.** `page`/`limit` today uses `OFFSET`, which gets slower as
+  the offset grows. At millions of rows, switch to keyset pagination (`WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT ?`) — the existing `(org_id, status)` and `(org_id, client_name)` indexes extend naturally to include a tiebreaker column.
+- **Read replicas.** List/search/audit-trail reads (the majority of traffic) move to one
+  or more RDS read replicas; writes stay on the primary. Requires the app to pick a
+  connection based on read vs. write, which Prisma supports via multiple datasources.
+- **Connection pooling at the proxy layer** (RDS Proxy or PgBouncer) once there are
+  enough backend instances that direct Postgres connections become the bottleneck —
+  Postgres has a hard cap on concurrent connections that horizontal app scaling will hit
+  well before the database's actual query capacity does.
+- **Partitioning `contract_events`** by time (monthly/quarterly range partitions) once
+  it's the largest table by far (every mutation writes one row, it only grows) — keeps
+  indexes small and makes old-partition archival/cold-storage trivial.
+
+**Real-time (the actual scaling wall in the current design)**
+- The in-memory `Map<orgId, Response[]>` in `sseManager.ts` only works because there's
+  one backend process. The moment there's more than one (which horizontal scaling
+  requires), a client connected to instance A never hears about a change committed via
+  instance B. Fix: move the broadcast through Redis Pub/Sub (or SNS/EventBridge) — each
+  instance still holds its own local SSE connections, but publishes/subscribes to a
+  shared channel instead of broadcasting only to its own in-memory map.
+- Beyond a few thousand concurrent SSE connections per instance, a managed real-time
+  service (Pusher, Ably, AWS AppSync subscriptions) removes the connection-scaling
+  problem entirely instead of managing it yourself.
+
+**Backend / compute**
+- Move off Elastic Beanstalk single-instance to an auto-scaling group behind a real load
+  balancer (or ECS/Fargate, or Kubernetes) — the current setup has no redundancy and no
+  scale-out path by design (it was the fastest unblocked option for this assignment).
+- Push anything not needed to answer the request immediately onto a queue (SQS + worker
+  process) — the obvious current candidate is virus-scanning/validating PDF uploads
+  before they're servable, which today happens inline.
+- Rate limiting / API gateway in front of the backend, so one noisy tenant can't degrade
+  the others in a shared multi-tenant deployment.
+
+**Storage & delivery**
+- S3 already scales natively — no change needed there. Add a CloudFront distribution in
+  front of the attachments bucket (separate from the one fronting the API) so downloads
+  are served from edge locations instead of round-tripping to `us-east-1` every time.
+- Amplify's static frontend is already CDN-backed and scales without any changes.
+
+**Operability at scale**
+- Structured logging + centralized aggregation (CloudWatch Logs, or ship to an ELK/Loki
+  stack), plus request tracing (OpenTelemetry) — right now logs are just `console.log`
+  on a single instance, which stops being debuggable the moment there's more than one.
+- CI/CD (GitHub Actions) instead of the manual `zip` + `aws elasticbeanstalk` deploys
+  used to get this assignment shipped — fine for one person over a few days, not for an
+  ongoing team.
+
+None of this is needed at the assignment's scale, and doing it upfront would have been
+over-engineering against the brief — but the schema/index choices already made
+(org-scoped composite indexes, JSONB for flexible payload + normalized columns for the
+hot filter paths, S3 for binary data instead of the database) are exactly the same
+choices a millions-of-rows version of this app would make. Nothing here requires
+re-architecting from scratch, just adding infrastructure around what's already there.
+
+---
+
+## API reference
 
 | Method | Path | Notes |
 |---|---|---|
@@ -204,71 +273,30 @@ safety net.
 | POST | `/api/contracts/:id/archive` | `FINALIZED → ARCHIVED` — `409` otherwise |
 | DELETE | `/api/contracts/:id` | `409` unless `DRAFT` |
 | GET | `/api/contracts/:id/events` | Audit trail, oldest first |
-| POST | `/api/contracts/:id/attachment` | Upload a PDF (multipart field `file`, any status) |
+| POST | `/api/contracts/:id/attachment` | Upload a PDF (multipart field `file`) |
 | GET | `/api/contracts/:id/attachment` | Download the PDF |
 | DELETE | `/api/contracts/:id/attachment` | Remove the PDF |
 
-All `/api/contracts*` routes require an `X-Org-Id` header (or `org_id` query param).
-Full interactive documentation for every endpoint above is at `/api-docs` once the
-backend is running (see "Bonus: OpenAPI/Swagger docs" below).
+All `/api/contracts*` routes require `X-Org-Id` (header or `org_id` query param).
+Interactive docs: `/api-docs`. Raw spec: `/openapi.yaml`.
 
-## Bonus features
+---
 
-All four suggested bonus items are implemented.
+## Bonus items (all four implemented)
 
-### Backend API tests
-
-`backend/tests/` has a Vitest + Supertest suite (17 tests) covering org scoping/cross-org
-`404`s, JSON schema validation errors, the full `DRAFT→FINALIZED→ARCHIVED` state machine
-and its `409`s, audit trail ordering/diffing, delete semantics, search/filter/pagination,
-and the PDF attachment endpoints (upload/download byte-for-byte, non-PDF rejection,
-cross-org 404, delete). Vitest was used instead of Jest — this backend is ESM
-(`"type": "module"`) and Vitest needs no extra ESM/TS transform config, while Jest does.
-
-```bash
-cd backend
-createdb contract_ops_console_test   # one-time, separate from the dev DB
-cp .env.test.example .env.test       # edit DATABASE_URL and S3_BUCKET_NAME
-npm test
-```
-
-The suite applies migrations to the test database automatically and truncates all tables
-between tests — it never touches your dev database or seeded data. The attachment tests
-exercise the real S3 bucket (needs AWS credentials available locally, e.g. via
-`aws configure`) but clean up every object they create afterward.
-
-### OpenAPI / Swagger docs
-
-`backend/openapi.yaml` documents every endpoint (including the attachment ones). With the
-backend running, open **http://localhost:4000/api-docs** for interactive Swagger UI, or
-fetch the raw spec at `http://localhost:4000/openapi.yaml`.
-
-### PDF attachment upload
-
-Each contract can have one PDF attached (see the "Design decisions" section above for the
-rules). On the contract detail page, the Attachment card shows a file picker when there's
-no attachment, or the filename/size as a download link plus a Remove button once one
-exists. Enforced server-side: only `application/pdf` is accepted, max 10MB, and — like
-every other contract endpoint — a cross-org request 404s rather than ever touching another
-org's file.
-
-### Docker / docker-compose (one-command local setup)
-
-Both apps have a production-style multi-stage `Dockerfile` (backend: Node → slim runtime;
-frontend: Vite build → nginx static serve with SPA fallback), plus a root
-`docker-compose.yml` that builds and runs both, wired together, in one command. The
-database is intentionally **not** containerized (per this project's setup, it uses your
-existing local Postgres instance directly) — `docker-compose.yml` reaches it via
-`host.docker.internal`. PDF attachments go to S3, so the backend container mounts your
-host's `~/.aws` credentials (read-only) to use whatever `aws configure` has set up.
-
-```bash
-cp .env.example .env   # set POSTGRES_USER, S3_BUCKET_NAME (and AWS_REGION if not us-east-1)
-docker compose up --build
-# frontend: http://localhost:8080   backend: http://localhost:4000
-```
-
-Everything above was actually built and run locally (not just written) to confirm it
-works: both Dockerfiles build clean, the compose stack was brought up and smoke-tested
-end-to-end against the real local Postgres instance, and the frontend container was
-verified in a real browser talking to the backend container with zero console errors.
+- **API tests** — `backend/tests/`, Vitest + Supertest, 17 tests: org-scoping/cross-org
+  `404`s, validation errors, the full status state machine and its `409`s, audit trail,
+  delete semantics, search/filter/pagination, PDF attachment upload/download/delete.
+  ```bash
+  cd backend
+  createdb contract_ops_console_test
+  cp .env.test.example .env.test
+  npm test
+  ```
+- **OpenAPI/Swagger** — `backend/openapi.yaml`, served as Swagger UI at `/api-docs`.
+- **PDF attachment upload** — per-contract, any status, `application/pdf` only, 10MB cap,
+  same cross-org `404` discipline as everything else. Inline preview + replace/remove on
+  the detail page.
+- **Docker/docker-compose** — multi-stage `Dockerfile` for both apps, root
+  `docker-compose.yml` builds and runs both together. Actually built and run locally to
+  confirm it works, not just written.
