@@ -1,0 +1,22 @@
+{
+  "client_name": "Meridian Textiles Ltd",
+  "po_ref_no": "PO-3005",
+  "po_date": "2026-07-15",
+  "payment_terms": "Net 45",
+  "delivery_terms": "CIF Mumbai Port",
+  "items": [
+    {
+      "description": "Cotton fabric rolls",
+      "quantity": 120,
+      "quantity_unit": "rolls",
+      "unit_price": 45.5,
+      "pricing_unit": "per roll"
+    },
+    {
+      "description": "Industrial sewing machines",
+      "quantity": 8,
+      "quantity_unit": "units",
+      "unit_price": 850
+    }
+  ]
+}
