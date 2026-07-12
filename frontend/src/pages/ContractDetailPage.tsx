@@ -141,7 +141,7 @@ export function ContractDetailPage() {
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+        <h1 className="text-xl font-semibold tracking-tight text-gray-800 dark:text-gray-100">
           {contract.clientName}
         </h1>
         <StatusBadge status={contract.status} />
@@ -160,7 +160,7 @@ export function ContractDetailPage() {
           <button
             onClick={() => finalizeMutation.mutate()}
             disabled={finalizeMutation.isPending}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-40"
+            className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600 disabled:opacity-40"
           >
             Finalize
           </button>
@@ -197,7 +197,7 @@ export function ContractDetailPage() {
       />
 
       {draft && (
-        <div className="mb-8 space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-8 space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-800">
           <Field
             label="Client name"
             value={draft.client_name}
@@ -248,7 +248,7 @@ export function ContractDetailPage() {
                       value={item.description}
                       onChange={(e) => updateItem(index, { description: e.target.value })}
                       placeholder="Description"
-                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-transparent"
+                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-transparent"
                     />
                     {fieldErrors?.[`items[${index}].description`] && (
                       <p className="text-xs text-red-600 dark:text-red-400">
@@ -263,7 +263,7 @@ export function ContractDetailPage() {
                       value={item.quantity}
                       onChange={(e) => updateItem(index, { quantity: Number(e.target.value) })}
                       placeholder="Qty"
-                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-transparent"
+                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-transparent"
                     />
                     {fieldErrors?.[`items[${index}].quantity`] && (
                       <p className="text-xs text-red-600 dark:text-red-400">
@@ -277,7 +277,7 @@ export function ContractDetailPage() {
                       value={item.quantity_unit ?? ""}
                       onChange={(e) => updateItem(index, { quantity_unit: e.target.value })}
                       placeholder="Unit"
-                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-transparent"
+                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-transparent"
                     />
                   </div>
                   <div className="col-span-2">
@@ -287,7 +287,7 @@ export function ContractDetailPage() {
                       value={item.unit_price}
                       onChange={(e) => updateItem(index, { unit_price: Number(e.target.value) })}
                       placeholder="Unit price"
-                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-transparent"
+                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm transition-colors disabled:border-transparent disabled:bg-transparent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-transparent"
                     />
                     {fieldErrors?.[`items[${index}].unit_price`] && (
                       <p className="text-xs text-red-600 dark:text-red-400">
@@ -311,7 +311,7 @@ export function ContractDetailPage() {
             {editing && (
               <button
                 onClick={addItem}
-                className="mt-2 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400"
+                className="mt-2 text-xs font-medium text-indigo-500 transition-colors hover:text-indigo-600 dark:text-indigo-400"
               >
                 + Add item
               </button>
@@ -323,7 +323,7 @@ export function ContractDetailPage() {
               <button
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-40"
+                className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600 disabled:opacity-40"
               >
                 Save
               </button>
@@ -342,19 +342,19 @@ export function ContractDetailPage() {
         </div>
       )}
 
-      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-800">
         <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
           <PaperclipIcon />
           Attachment
         </h2>
         {contract.attachmentFilename ? (
           <div>
-            <div className="flex items-center justify-between rounded-md border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/40">
+            <div className="flex items-center justify-between rounded-md border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm dark:border-indigo-900/50 dark:bg-indigo-900/40">
               <a
                 href={api.attachmentUrl(selectedOrgId!, contract.id)}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 font-medium text-indigo-700 transition-colors hover:underline dark:text-indigo-300"
+                className="flex items-center gap-2 font-medium text-indigo-500 transition-colors hover:underline dark:text-indigo-300"
               >
                 <PaperclipIcon />
                 {contract.attachmentFilename}
@@ -365,7 +365,7 @@ export function ContractDetailPage() {
                 )}
               </a>
               <div className="flex items-center gap-1">
-                <label className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-900/50">
+                <label className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-indigo-500 transition-colors hover:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-900/50">
                   {uploadAttachmentMutation.isPending ? "Uploading…" : "Replace"}
                   <input
                     type="file"
@@ -404,7 +404,7 @@ export function ContractDetailPage() {
             className={`flex cursor-pointer flex-col items-center gap-1 rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors ${
               uploadAttachmentMutation.isPending
                 ? "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/40"
-                : "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 dark:border-gray-700 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/30"
+                : "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 dark:border-gray-700 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/30"
             }`}
           >
             <input
@@ -462,7 +462,7 @@ function Field({
         disabled={!editing}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm transition-colors disabled:border-transparent disabled:bg-transparent disabled:px-0 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-transparent"
+        className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm transition-colors disabled:border-transparent disabled:bg-transparent disabled:px-0 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-transparent"
       />
       {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </label>

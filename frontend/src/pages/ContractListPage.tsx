@@ -89,10 +89,10 @@ export function ContractListPage() {
   return (
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Contracts</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-gray-800 dark:text-gray-100">Contracts</h1>
         <Link
           to="/upload"
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
+          className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600"
         >
           Upload contract
         </Link>
@@ -104,12 +104,12 @@ export function ContractListPage() {
           placeholder="Search by client name or contract ID…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="min-w-64 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          className="min-w-64 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ContractStatus | "")}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -125,13 +125,13 @@ export function ContractListPage() {
       {data && (
         <>
           {data.contracts.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
               <EmptyState />
             </div>
           ) : (
             <>
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm md:block dark:border-gray-800 dark:bg-gray-900">
+              <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm md:block dark:border-gray-800 dark:bg-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
                     <tr>
@@ -148,7 +148,7 @@ export function ContractListPage() {
                         key={contract.id}
                         className="border-t border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/40"
                       >
-                        <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
+                        <td className="px-4 py-3 text-gray-800 dark:text-gray-100">
                           <ClientNameCell contract={contract} />
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{contract.poRefNo}</td>
@@ -161,7 +161,7 @@ export function ContractListPage() {
                         <td className="px-4 py-3 text-right">
                           <Link
                             to={`/contracts/${contract.id}`}
-                            className="font-medium text-indigo-600 transition-colors hover:text-indigo-700 hover:underline dark:text-indigo-400"
+                            className="font-medium text-indigo-500 transition-colors hover:text-indigo-600 hover:underline dark:text-indigo-400"
                           >
                             View
                           </Link>
@@ -178,10 +178,10 @@ export function ContractListPage() {
                   <Link
                     key={contract.id}
                     to={`/contracts/${contract.id}`}
-                    className="block rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow dark:border-gray-800 dark:bg-gray-900"
+                    className="block rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow dark:border-gray-800 dark:bg-gray-800"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                      <span className="font-medium text-gray-800 dark:text-gray-100">
                         <ClientNameCell contract={contract} />
                       </span>
                       <StatusBadge status={contract.status} />

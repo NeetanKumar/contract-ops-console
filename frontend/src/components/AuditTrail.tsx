@@ -35,10 +35,10 @@ export function AuditTrail({ events }: { events: ContractEvent[] }) {
       {events.map((event) => (
         <li
           key={event.id}
-          className="rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-sm transition-shadow hover:shadow dark:border-gray-800 dark:bg-gray-900"
+          className="rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-sm transition-shadow hover:shadow dark:border-gray-800 dark:bg-gray-800"
         >
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
+            <span className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-100">
               <span className={`h-1.5 w-1.5 rounded-full ${EVENT_DOT[event.eventType]}`} />
               {EVENT_LABEL[event.eventType]}
             </span>

@@ -2,7 +2,7 @@ import type { ContractStatus } from "../types/contract";
 
 const STYLES: Record<ContractStatus, string> = {
   DRAFT: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  FINALIZED: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+  FINALIZED: "bg-indigo-100 text-indigo-500 dark:bg-indigo-900 dark:text-indigo-300",
   ARCHIVED: "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 

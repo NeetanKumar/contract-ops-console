@@ -39,13 +39,13 @@ export function ConfirmDialog({
       role="presentation"
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
+        className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
       >
-        <h2 id="confirm-dialog-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        <h2 id="confirm-dialog-title" className="text-base font-semibold text-gray-800 dark:text-gray-100">
           {title}
         </h2>
         <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{description}</p>
@@ -60,7 +60,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={pending}
             className={`rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-              danger ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
+              danger ? "bg-red-600 hover:bg-red-700" : "bg-indigo-500 hover:bg-indigo-600"
             }`}
           >
             {pending ? "Working…" : confirmLabel}

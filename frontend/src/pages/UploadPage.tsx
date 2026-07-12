@@ -64,11 +64,11 @@ export function UploadPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-4 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+      <h1 className="mb-4 text-xl font-semibold tracking-tight text-gray-800 dark:text-gray-100">
         Upload contract
       </h1>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-800">
         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Contract JSON
           <textarea
@@ -76,7 +76,7 @@ export function UploadPage() {
             onChange={(e) => setJsonText(e.target.value)}
             placeholder={PLACEHOLDER}
             rows={16}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-3 font-mono text-xs transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-3 font-mono text-xs transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
         </label>
 
@@ -93,7 +93,7 @@ export function UploadPage() {
           <button
             onClick={handleSubmit}
             disabled={!jsonText.trim() || submitting}
-            className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-40"
+            className="rounded-md bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600 disabled:opacity-40"
           >
             {submitting ? "Submitting…" : "Submit"}
           </button>
