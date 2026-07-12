@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { PaperclipIcon } from "../components/PaperclipIcon";
 import { ListSkeleton } from "../components/Skeleton";
+import { inputBaseClass } from "../lib/inputStyles";
 import type { Contract, ContractStatus } from "../types/contract";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -106,12 +107,12 @@ export function ContractListPage() {
           placeholder="Search by client name or contract ID…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="min-w-64 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+          className={`min-w-64 flex-1 ${inputBaseClass} px-3 py-1.5 focus:border-indigo-400 focus:outline-none`}
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ContractStatus | "")}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+          className={`${inputBaseClass} px-3 py-1.5`}
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -211,7 +212,7 @@ export function ContractListPage() {
                     setLimit(Number(e.target.value));
                     setPage(1);
                   }}
-                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                  className={`${inputBaseClass} px-2 py-1`}
                 >
                   {PAGE_SIZE_OPTIONS.map((size) => (
                     <option key={size} value={size}>
@@ -221,20 +222,20 @@ export function ContractListPage() {
                 </select>
               </label>
               <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="rounded-md border border-gray-400 bg-white px-3 py-1 text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-              >
-                Prev
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="rounded-md border border-gray-400 bg-white px-3 py-1 text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-              >
-                Next
-              </button>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded-md border border-gray-400 bg-white px-3 py-1 text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-md border border-gray-400 bg-white px-3 py-1 text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                >
+                  Next
+                </button>
               </div>
             </div>
           </div>

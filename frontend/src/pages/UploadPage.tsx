@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrg } from "../context/OrgContext";
-import { api, ApiError } from "../api/client";
+import { api, ApiError, toErrorMessage } from "../api/client";
+import { inputBaseClass } from "../lib/inputStyles";
 import type { FieldErrors } from "../types/contract";
 
 const PLACEHOLDER = `{
@@ -52,10 +53,8 @@ export function UploadPage() {
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
         setFieldErrors(err.fieldErrors);
-      } else if (err instanceof ApiError) {
-        setGenericError(err.message);
       } else {
-        setGenericError("Something went wrong. Please try again.");
+        setGenericError(toErrorMessage(err, "Something went wrong. Please try again."));
       }
     } finally {
       setSubmitting(false);
@@ -76,7 +75,7 @@ export function UploadPage() {
             onChange={(e) => setJsonText(e.target.value)}
             placeholder={PLACEHOLDER}
             rows={16}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-3 font-mono text-xs transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className={`mt-1 block w-full ${inputBaseClass} p-3 font-mono text-xs focus:border-indigo-400 focus:outline-none dark:bg-gray-900`}
           />
         </label>
 

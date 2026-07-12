@@ -3,7 +3,7 @@ import multer from "multer";
 import { contractSchema, formatFieldErrors } from "../validation/contractSchema.js";
 import { AppError } from "../lib/AppError.js";
 import * as contractService from "../services/contractService.js";
-import { uploadAttachment, getAttachmentStream } from "../lib/attachmentStorage.js";
+import { uploadAttachment, getAttachmentStream, deleteAttachmentObject } from "../lib/attachmentStorage.js";
 
 export const contractsRouter = Router();
 
@@ -104,8 +104,15 @@ contractsRouter.delete("/:id", async (req, res) => {
 
 contractsRouter.post("/:id/attachment", verifyContractOwnership, uploadPdf, async (req, res) => {
   await uploadAttachment(req.params.id, req.file!.buffer, req.file!.mimetype);
-  const contract = await contractService.saveAttachment(req.orgId!, req.params.id, req.file!);
-  res.status(201).json(contract);
+  try {
+    const contract = await contractService.saveAttachment(req.orgId!, req.params.id, req.file!);
+    res.status(201).json(contract);
+  } catch (err) {
+    // The contract vanished (e.g. deleted concurrently) between the ownership check
+    // and this save — clean up the object we just wrote so it doesn't orphan in S3.
+    await deleteAttachmentObject(req.params.id).catch(() => {});
+    throw err;
+  }
 });
 
 contractsRouter.get("/:id/attachment", async (req, res) => {
@@ -116,6 +123,13 @@ contractsRouter.get("/:id/attachment", async (req, res) => {
   res.setHeader("Content-Type", contract.attachmentMimeType ?? "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${contract.attachmentFilename}"`);
   const stream = await getAttachmentStream(contract.id);
+  stream.on("error", () => {
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to read attachment" });
+    } else {
+      res.destroy();
+    }
+  });
   stream.pipe(res);
 });
 

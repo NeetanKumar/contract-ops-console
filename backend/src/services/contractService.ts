@@ -4,14 +4,25 @@ import { AppError } from "../lib/AppError.js";
 import type { ContractInput } from "../validation/contractSchema.js";
 import { broadcastStatusChanged } from "../sse/sseManager.js";
 import { deleteAttachmentObject } from "../lib/attachmentStorage.js";
+import { isValidUUID } from "../lib/validation.js";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_STATUSES = new Set<string>(Object.values(ContractStatus));
 
 const ALLOWED_TRANSITIONS: Record<ContractStatus, ContractStatus | null> = {
   DRAFT: ContractStatus.FINALIZED,
   FINALIZED: ContractStatus.ARCHIVED,
   ARCHIVED: null,
 };
+
+/** Single canonical org-scoped existence check, used by every function below so the
+ * "belongs to this org or 404" guarantee has exactly one implementation to audit. */
+async function mustFindContract(orgId: string, id: string) {
+  const contract = await prisma.contract.findFirst({ where: { id, orgId } });
+  if (!contract) {
+    throw new AppError(404, "Contract not found");
+  }
+  return contract;
+}
 
 function computeDiff(
   oldData: Record<string, unknown>,
@@ -65,7 +76,9 @@ export async function listContracts(orgId: string, filters: ListFilters) {
   const where: Prisma.ContractWhereInput = { orgId };
 
   if (filters.status) {
-    if (!(filters.status in ContractStatus)) {
+    // Set membership check on the enum's own values — NOT the `in` operator, which
+    // checks the prototype chain too (`'constructor' in ContractStatus` is true).
+    if (!VALID_STATUSES.has(filters.status)) {
       throw new AppError(400, `Invalid status filter: ${filters.status}`);
     }
     where.status = filters.status as ContractStatus;
@@ -76,7 +89,7 @@ export async function listContracts(orgId: string, filters: ListFilters) {
   }
 
   if (filters.contractId) {
-    if (!UUID_PATTERN.test(filters.contractId)) {
+    if (!isValidUUID(filters.contractId)) {
       // Not a valid UUID -> can never match a real row, short-circuit to empty result.
       return { contracts: [], total: 0, page: filters.page, limit: filters.limit };
     }
@@ -97,18 +110,11 @@ export async function listContracts(orgId: string, filters: ListFilters) {
 }
 
 export async function getContract(orgId: string, id: string) {
-  const contract = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!contract) {
-    throw new AppError(404, "Contract not found");
-  }
-  return contract;
+  return mustFindContract(orgId, id);
 }
 
 export async function updateContract(orgId: string, id: string, input: ContractInput) {
-  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!existing) {
-    throw new AppError(404, "Contract not found");
-  }
+  const existing = await mustFindContract(orgId, id);
   if (existing.status !== ContractStatus.DRAFT) {
     throw new AppError(409, "Only DRAFT contracts can be updated");
   }
@@ -138,10 +144,7 @@ export async function updateContract(orgId: string, id: string, input: ContractI
 }
 
 async function transitionStatus(orgId: string, id: string, expectedCurrent: ContractStatus) {
-  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!existing) {
-    throw new AppError(404, "Contract not found");
-  }
+  const existing = await mustFindContract(orgId, id);
   if (existing.status !== expectedCurrent) {
     throw new AppError(
       409,
@@ -186,12 +189,16 @@ export function archiveContract(orgId: string, id: string) {
 }
 
 export async function deleteContract(orgId: string, id: string) {
-  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!existing) {
-    throw new AppError(404, "Contract not found");
-  }
+  const existing = await mustFindContract(orgId, id);
   if (existing.status !== ContractStatus.DRAFT) {
     throw new AppError(409, "Only DRAFT contracts can be deleted");
+  }
+
+  // Clean up any attached PDF first — if this fails, we bail out before touching the
+  // row, so we never end up with a deleted contract whose attachment is still in S3
+  // with nothing left to reference it.
+  if (existing.attachmentFilename) {
+    await deleteAttachmentObject(id);
   }
 
   await prisma.$transaction(async (tx) => {
@@ -208,10 +215,7 @@ export async function deleteContract(orgId: string, id: string) {
 }
 
 export async function getContractEvents(orgId: string, id: string) {
-  const contract = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!contract) {
-    throw new AppError(404, "Contract not found");
-  }
+  await mustFindContract(orgId, id);
   return prisma.contractEvent.findMany({
     where: { contractId: id },
     orderBy: { createdAt: "asc" },
@@ -223,10 +227,7 @@ type AttachmentFile = { originalname: string; mimetype: string; size: number };
 /** Attachments are supplementary reference documents (e.g. the signed PO), not part
  * of the versioned contract JSON — allowed regardless of status, and not audited. */
 export async function saveAttachment(orgId: string, id: string, file: AttachmentFile) {
-  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!existing) {
-    throw new AppError(404, "Contract not found");
-  }
+  await mustFindContract(orgId, id);
   return prisma.contract.update({
     where: { id },
     data: {
@@ -239,12 +240,11 @@ export async function saveAttachment(orgId: string, id: string, file: Attachment
 }
 
 export async function deleteAttachment(orgId: string, id: string) {
-  const existing = await prisma.contract.findFirst({ where: { id, orgId } });
-  if (!existing) {
-    throw new AppError(404, "Contract not found");
-  }
+  const existing = await mustFindContract(orgId, id);
   if (existing.attachmentFilename) {
-    await deleteAttachmentObject(id).catch(() => {});
+    // Let a failure here propagate — if S3 can't delete the object, the DB must keep
+    // saying the attachment exists, so the two stay consistent with reality.
+    await deleteAttachmentObject(id);
   }
   return prisma.contract.update({
     where: { id },

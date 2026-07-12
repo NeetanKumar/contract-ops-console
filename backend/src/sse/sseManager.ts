@@ -10,13 +10,25 @@ type StatusChangedEvent = {
 
 const connectionsByOrg = new Map<string, Set<Response>>();
 
+function safeWrite(res: Response, chunk: string, cleanup: () => void) {
+  try {
+    if (res.writableEnded || res.destroyed) {
+      cleanup();
+      return;
+    }
+    res.write(chunk);
+  } catch {
+    // Socket died between our liveness check and the write — treat like a close.
+    cleanup();
+  }
+}
+
 export function registerConnection(orgId: string, res: Response) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
   });
-  res.write(": connected\n\n");
 
   let connections = connectionsByOrg.get(orgId);
   if (!connections) {
@@ -24,10 +36,6 @@ export function registerConnection(orgId: string, res: Response) {
     connectionsByOrg.set(orgId, connections);
   }
   connections.add(res);
-
-  const heartbeat = setInterval(() => {
-    res.write(": heartbeat\n\n");
-  }, HEARTBEAT_INTERVAL_MS);
 
   const cleanup = () => {
     clearInterval(heartbeat);
@@ -37,7 +45,15 @@ export function registerConnection(orgId: string, res: Response) {
     }
   };
 
+  safeWrite(res, ": connected\n\n", cleanup);
+
+  const heartbeat = setInterval(() => {
+    safeWrite(res, ": heartbeat\n\n", cleanup);
+  }, HEARTBEAT_INTERVAL_MS);
+
   res.req.on("close", cleanup);
+  res.req.on("error", cleanup);
+  res.on("error", cleanup);
 }
 
 export function broadcastStatusChanged(orgId: string, event: StatusChangedEvent) {
@@ -46,6 +62,6 @@ export function broadcastStatusChanged(orgId: string, event: StatusChangedEvent)
 
   const payload = `event: contract_status_changed\ndata: ${JSON.stringify(event)}\n\n`;
   for (const res of connections) {
-    res.write(payload);
+    safeWrite(res, payload, () => connections.delete(res));
   }
 }

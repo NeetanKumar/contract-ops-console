@@ -1,4 +1,5 @@
 import { useOrg } from "../context/OrgContext";
+import { inputBaseClass } from "../lib/inputStyles";
 
 export function OrgSelector() {
   const { organisations, isLoading, selectedOrgId, setSelectedOrgId } = useOrg();
@@ -9,7 +10,7 @@ export function OrgSelector() {
 
   return (
     <select
-      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm transition-colors hover:border-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
+      className={`${inputBaseClass} px-3 py-1.5 hover:border-gray-400 dark:hover:border-gray-600`}
       value={selectedOrgId ?? ""}
       onChange={(e) => setSelectedOrgId(e.target.value)}
       aria-label="Selected organisation"

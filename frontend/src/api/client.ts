@@ -19,6 +19,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Shared onError extraction so every mutation shows the server's actual message
+ * when there is one, instead of each call site re-deriving this fallback logic. */
+export function toErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 type RequestOptions = RequestInit & { orgId?: string };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
