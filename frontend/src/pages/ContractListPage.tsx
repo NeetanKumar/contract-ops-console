@@ -5,12 +5,49 @@ import { useOrg } from "../context/OrgContext";
 import { api } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { PaperclipIcon } from "../components/PaperclipIcon";
-import type { ContractStatus } from "../types/contract";
+import { ListSkeleton } from "../components/Skeleton";
+import type { Contract, ContractStatus } from "../types/contract";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LIMIT = 10;
 
 const STATUS_OPTIONS: (ContractStatus | "")[] = ["", "DRAFT", "FINALIZED", "ARCHIVED"];
+
+function ClientNameCell({ contract }: { contract: Contract }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {contract.clientName}
+      {contract.attachmentFilename && (
+        <PaperclipIcon
+          className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500"
+          title={`Has attachment: ${contract.attachmentFilename}`}
+        />
+      )}
+    </span>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-center">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        className="h-10 w-10 text-gray-300 dark:text-gray-700"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l4.414 4.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"
+        />
+      </svg>
+      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No contracts match your filters</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">Try a different search term or status.</p>
+    </div>
+  );
+}
 
 export function ContractListPage() {
   const { selectedOrgId } = useOrg();
@@ -52,10 +89,10 @@ export function ContractListPage() {
   return (
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Contracts</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Contracts</h1>
         <Link
           to="/upload"
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
         >
           Upload contract
         </Link>
@@ -67,12 +104,12 @@ export function ContractListPage() {
           placeholder="Search by client name or contract ID…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="min-w-64 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          className="min-w-64 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ContractStatus | "")}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -82,60 +119,84 @@ export function ContractListPage() {
         </select>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {isError && <p className="text-sm text-red-600">Failed to load contracts.</p>}
+      {isLoading && <ListSkeleton />}
+      {isError && <p className="text-sm text-red-600 dark:text-red-400">Failed to load contracts.</p>}
 
       {data && (
         <>
-          <div className="overflow-x-auto rounded-md border border-gray-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-4 py-2">Client</th>
-                  <th className="px-4 py-2">PO Ref</th>
-                  <th className="px-4 py-2">PO Date</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.contracts.map((contract) => (
-                  <tr key={contract.id} className="border-t border-gray-100">
-                    <td className="px-4 py-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        {contract.clientName}
-                        {contract.attachmentFilename && (
-                          <PaperclipIcon
-                            className="h-3.5 w-3.5 shrink-0 text-gray-400"
-                            title={`Has attachment: ${contract.attachmentFilename}`}
-                          />
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">{contract.poRefNo}</td>
-                    <td className="px-4 py-2">{contract.poDate.slice(0, 10)}</td>
-                    <td className="px-4 py-2">
-                      <StatusBadge status={contract.status} />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <Link to={`/contracts/${contract.id}`} className="text-blue-600 hover:underline">
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {data.contracts.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                      No contracts match your filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {data.contracts.length === 0 ? (
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <EmptyState />
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm md:block dark:border-gray-800 dark:bg-gray-900">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+                    <tr>
+                      <th className="px-4 py-2.5">Client</th>
+                      <th className="px-4 py-2.5">PO Ref</th>
+                      <th className="px-4 py-2.5">PO Date</th>
+                      <th className="px-4 py-2.5">Status</th>
+                      <th className="px-4 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.contracts.map((contract) => (
+                      <tr
+                        key={contract.id}
+                        className="border-t border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/40"
+                      >
+                        <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
+                          <ClientNameCell contract={contract} />
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{contract.poRefNo}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {contract.poDate.slice(0, 10)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={contract.status} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link
+                            to={`/contracts/${contract.id}`}
+                            className="font-medium text-indigo-600 transition-colors hover:text-indigo-700 hover:underline dark:text-indigo-400"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+              {/* Mobile card list */}
+              <div className="space-y-2 md:hidden">
+                {data.contracts.map((contract) => (
+                  <Link
+                    key={contract.id}
+                    to={`/contracts/${contract.id}`}
+                    className="block rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow dark:border-gray-800 dark:bg-gray-900"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        <ClientNameCell contract={contract} />
+                      </span>
+                      <StatusBadge status={contract.status} />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>{contract.poRefNo}</span>
+                      <span>{contract.poDate.slice(0, 10)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
             <span>
               {data.total} contract{data.total === 1 ? "" : "s"} · Page {page} of {totalPages}
             </span>
@@ -143,14 +204,14 @@ export function ContractListPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-md border border-gray-300 px-3 py-1 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 Prev
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-md border border-gray-300 px-3 py-1 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 Next
               </button>

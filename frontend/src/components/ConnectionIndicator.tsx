@@ -14,7 +14,7 @@ const DOT_COLOR: Record<ConnectionState, string> = {
 
 export function ConnectionIndicator({ state }: { state: ConnectionState }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
       <span className={`h-2 w-2 rounded-full ${DOT_COLOR[state]}`} />
       {LABEL[state]}
     </span>
