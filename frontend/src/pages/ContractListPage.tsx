@@ -9,7 +9,8 @@ import { ListSkeleton } from "../components/Skeleton";
 import type { Contract, ContractStatus } from "../types/contract";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LIMIT = 10;
+const DEFAULT_LIMIT = 10;
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 const STATUS_OPTIONS: (ContractStatus | "")[] = ["", "DRAFT", "FINALIZED", "ARCHIVED"];
 
@@ -55,6 +56,7 @@ export function ContractListPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ContractStatus | "">("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(DEFAULT_LIMIT);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -68,7 +70,7 @@ export function ContractListPage() {
     setPage(1);
   }, [status]);
 
-  const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (status) params.set("status", status);
   if (search) {
     if (UUID_PATTERN.test(search)) {
@@ -196,11 +198,29 @@ export function ContractListPage() {
             </>
           )}
 
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-400">
             <span>
               {data.total} contract{data.total === 1 ? "" : "s"} · Page {page} of {totalPages}
             </span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5">
+                Per page
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
@@ -215,6 +235,7 @@ export function ContractListPage() {
               >
                 Next
               </button>
+              </div>
             </div>
           </div>
         </>
