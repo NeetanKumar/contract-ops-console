@@ -1,9 +1,11 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
+import { z } from "zod";
 import multer from "multer";
 import { contractSchema, formatFieldErrors } from "../validation/contractSchema.js";
 import { AppError } from "../lib/AppError.js";
 import * as contractService from "../services/contractService.js";
 import { uploadAttachment, getAttachmentStream, deleteAttachmentObject } from "../lib/attachmentStorage.js";
+import { extractDealTerms, toContractInput } from "../services/dealExtractionService.js";
 
 export const contractsRouter = Router();
 
@@ -51,6 +53,30 @@ contractsRouter.post("/", async (req, res) => {
   }
   const contract = await contractService.createContract(req.orgId!, parsed.data);
   res.status(201).json(contract);
+});
+
+const fromWhatsAppSchema = z.object({
+  thread: z.string({ error: "thread is required" }).min(1, "thread is required"),
+});
+
+contractsRouter.post("/from-whatsapp", async (req, res) => {
+  const parsed = fromWhatsAppSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(400, "Validation failed", formatFieldErrors(parsed.error));
+  }
+
+  const extraction = await extractDealTerms(parsed.data.thread);
+  const input = toContractInput(extraction);
+
+  const validated = contractSchema.safeParse(input);
+  if (!validated.success) {
+    // Should be unreachable given toContractInput's fallbacks, but surfaces cleanly
+    // instead of a 500 if the model output ever produces something unmappable.
+    throw new AppError(422, "Extracted data could not form a valid contract", formatFieldErrors(validated.error));
+  }
+
+  const contract = await contractService.createContract(req.orgId!, validated.data);
+  res.status(201).json({ contract, extraction });
 });
 
 contractsRouter.get("/", async (req, res) => {

@@ -2,8 +2,13 @@ import type {
   Contract,
   ContractEvent,
   ContractListResponse,
+  DealExtraction,
   FieldErrors,
   Organisation,
+  WhatsAppCloudStatus,
+  WhatsAppConnectionStatus,
+  WhatsAppNegotiation,
+  WhatsAppUnmatchedMessage,
 } from "../types/contract";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -66,6 +71,13 @@ export const api = {
   createContract: (orgId: string, body: unknown) =>
     request<Contract>("/api/contracts", { orgId, method: "POST", body: JSON.stringify(body) }),
 
+  createContractFromWhatsApp: (orgId: string, thread: string) =>
+    request<{ contract: Contract; extraction: DealExtraction }>("/api/contracts/from-whatsapp", {
+      orgId,
+      method: "POST",
+      body: JSON.stringify({ thread }),
+    }),
+
   updateContract: (orgId: string, id: string, body: unknown) =>
     request<Contract>(`/api/contracts/${id}`, { orgId, method: "PUT", body: JSON.stringify(body) }),
 
@@ -98,6 +110,48 @@ export const api = {
 
   deleteAttachment: (orgId: string, id: string) =>
     request<void>(`/api/contracts/${id}/attachment`, { orgId, method: "DELETE" }),
+
+  getCloudApiStatus: (orgId: string) =>
+    request<WhatsAppCloudStatus>("/api/whatsapp/cloud-status", { orgId }),
+
+  listWhatsAppNegotiations: (orgId: string) =>
+    request<{ negotiations: WhatsAppNegotiation[] }>("/api/whatsapp/negotiations", { orgId }),
+
+  createWhatsAppNegotiation: (
+    orgId: string,
+    body: { ourPhone: string; counterpartyPhone: string; direction: "WE_BUY" | "WE_SELL"; label?: string },
+  ) =>
+    request<WhatsAppNegotiation>("/api/whatsapp/negotiations", {
+      orgId,
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  abandonWhatsAppNegotiation: (orgId: string, id: string) =>
+    request<WhatsAppNegotiation>(`/api/whatsapp/negotiations/${id}/abandon`, { orgId, method: "POST" }),
+
+  listUnmatchedMessages: (orgId: string) =>
+    request<{ messages: WhatsAppUnmatchedMessage[] }>("/api/whatsapp/unmatched-messages", { orgId }),
+
+  assignUnmatchedMessage: (orgId: string, id: string, negotiationId: string) =>
+    request<void>(`/api/whatsapp/unmatched-messages/${id}/assign`, {
+      orgId,
+      method: "POST",
+      body: JSON.stringify({ negotiationId }),
+    }),
+
+  getWhatsAppConnection: (orgId: string) =>
+    request<WhatsAppConnectionStatus>("/api/whatsapp/connection", { orgId }),
+
+  completeEmbeddedSignup: (
+    orgId: string,
+    body: { code: string; wabaId: string; phoneNumberId: string; displayPhoneNumber: string },
+  ) =>
+    request<WhatsAppConnectionStatus>("/api/whatsapp/embedded-signup", {
+      orgId,
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 export { API_URL };

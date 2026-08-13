@@ -14,3 +14,4 @@ backend/prisma/dev.db
 
 # Deployment secrets (RDS master password, etc.) — local only, never committed
 /.deploy-secrets
+

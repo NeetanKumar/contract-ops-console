@@ -61,3 +61,57 @@ export type ContractListResponse = {
   page: number;
   limit: number;
 };
+
+export type ExtractedField<T> = {
+  value: T | null;
+  confidence: number;
+};
+
+export type DealLineItem = {
+  commodity: ExtractedField<string>;
+  quantity: ExtractedField<number>;
+  unit: ExtractedField<string>;
+  price: ExtractedField<number>;
+};
+
+export type DealExtraction = {
+  deal_status: "negotiating" | "agreed";
+  direction: "WE_BUY" | "WE_SELL" | "UNKNOWN";
+  items: DealLineItem[];
+  counterparty: ExtractedField<string>;
+  delivery_date: ExtractedField<string>;
+};
+
+export type WhatsAppCloudStatus = {
+  configured: boolean;
+  missing: string[];
+};
+
+export type WhatsAppNegotiationStatus = "OPEN" | "AGREED" | "ABANDONED";
+export type WhatsAppDealDirection = "WE_BUY" | "WE_SELL" | "UNKNOWN";
+
+export type WhatsAppNegotiation = {
+  id: string;
+  orgId: string;
+  ourPhone: string;
+  counterpartyPhone: string;
+  direction: WhatsAppDealDirection;
+  label: string | null;
+  status: WhatsAppNegotiationStatus;
+  lines: string[];
+  resultingContractId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WhatsAppConnectionStatus =
+  | { connected: false }
+  | { connected: true; displayPhoneNumber: string; connectedAt: string };
+
+export type WhatsAppUnmatchedMessage = {
+  id: string;
+  orgId: string;
+  from: string;
+  body: string;
+  receivedAt: string;
+};
