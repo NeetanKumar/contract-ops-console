@@ -93,12 +93,20 @@ export function ContractListPage() {
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight text-gray-800 dark:text-gray-100">Contracts</h1>
-        <Link
-          to="/upload"
-          className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600"
-        >
-          Upload contract
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/whatsapp-import"
+            className="rounded-md border border-indigo-500 px-3 py-1.5 text-sm font-medium text-indigo-500 shadow-sm transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
+          >
+            Import from WhatsApp
+          </Link>
+          <Link
+            to="/upload"
+            className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-600"
+          >
+            Upload contract
+          </Link>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">

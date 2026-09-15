@@ -20,28 +20,43 @@ enum ContractEventType {
   DELETED
 }
 
+enum WhatsAppNegotiationStatus {
+  OPEN
+  AGREED
+  ABANDONED
+}
+
+enum WhatsAppDealDirection {
+  WE_BUY
+  WE_SELL
+  UNKNOWN
+}
+
 model Organisation {
-  id        String     @id @default(uuid()) @db.Uuid
-  name      String
-  createdAt DateTime   @default(now()) @map("created_at")
-  contracts Contract[]
-  events    ContractEvent[]
+  id                 String                     @id @default(uuid()) @db.Uuid
+  name               String
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  contracts          Contract[]
+  events             ContractEvent[]
+  negotiations       WhatsAppNegotiation[]
+  unmatchedMessages  WhatsAppUnmatchedMessage[]
+  whatsappConnection WhatsAppConnection?
 
   @@map("organisations")
 }
 
 model Contract {
-  id        String         @id @default(uuid()) @db.Uuid
-  orgId     String         @map("org_id") @db.Uuid
-  org       Organisation   @relation(fields: [orgId], references: [id])
-  clientName String        @map("client_name")
-  poRefNo   String         @map("po_ref_no")
-  poDate    DateTime       @map("po_date") @db.Date
-  status    ContractStatus @default(DRAFT)
-  fieldData Json           @map("field_data")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-  events    ContractEvent[]
+  id         String          @id @default(uuid()) @db.Uuid
+  orgId      String          @map("org_id") @db.Uuid
+  org        Organisation    @relation(fields: [orgId], references: [id])
+  clientName String          @map("client_name")
+  poRefNo    String          @map("po_ref_no")
+  poDate     DateTime        @map("po_date") @db.Date
+  status     ContractStatus  @default(DRAFT)
+  fieldData  Json            @map("field_data")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  events     ContractEvent[]
 
   // Bonus: optional PDF attachment (e.g. the original signed PO). File bytes live in
   // S3 (see src/lib/attachmentStorage.ts); these columns are just metadata.
@@ -53,6 +68,77 @@ model Contract {
   @@index([orgId, status])
   @@index([orgId, clientName])
   @@map("contracts")
+}
+
+// Dedup for WhatsApp Cloud API webhook deliveries. Meta redelivers a webhook if our
+// endpoint doesn't ack fast enough, and each message carries its own unique id — so
+// dedup is a straightforward "have we seen this message id before" check, rather than
+// the timestamp-cursor approach a polling-based design would need.
+model WhatsAppProcessedMessage {
+  messageId   String   @id @map("message_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("whatsapp_processed_messages")
+}
+
+// One negotiation = one deal being worked out over WhatsApp between two phone numbers
+// (ours and the counterparty's). Neither phone field is unique: the org can run many
+// negotiations concurrently, in either direction, and can share a phone number across
+// several open deals (e.g. buying from one counterparty while selling to another) —
+// see whatsappCloudApi.ts's routing logic for how an incoming message picks the right
+// row when a phone number matches more than one.
+model WhatsAppNegotiation {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  orgId               String                    @map("org_id") @db.Uuid
+  org                 Organisation              @relation(fields: [orgId], references: [id])
+  ourPhone            String                    @map("our_phone")
+  counterpartyPhone   String                    @map("counterparty_phone")
+  direction           WhatsAppDealDirection     @default(UNKNOWN)
+  label               String?
+  status              WhatsAppNegotiationStatus @default(OPEN)
+  lines               Json                      @default("[]")
+  resultingContractId String?                   @map("resulting_contract_id") @db.Uuid
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+
+  @@index([orgId, status])
+  @@index([ourPhone, status])
+  @@index([counterpartyPhone, status])
+  @@map("whatsapp_negotiations")
+}
+
+// A real business's own WhatsApp number, connected via Meta's Embedded Signup
+// (Coexistence) flow — as opposed to the single shared Meta test number used for dev/test,
+// which is configured via env vars and never has a row here. `phoneNumberId` is the routing
+// key: incoming webhook events name a phone_number_id, and whichever table (env var vs. this
+// one) it matches decides which code path handles it (see whatsappCloudApi.ts).
+model WhatsAppConnection {
+  id                 String       @id @default(uuid()) @db.Uuid
+  orgId              String       @unique @map("org_id") @db.Uuid
+  org                Organisation @relation(fields: [orgId], references: [id])
+  wabaId             String       @map("waba_id")
+  phoneNumberId      String       @unique @map("phone_number_id")
+  displayPhoneNumber String       @map("display_phone_number")
+  accessToken        String       @map("access_token")
+  connectedAt        DateTime     @default(now()) @map("connected_at")
+
+  @@map("whatsapp_connections")
+}
+
+// A message that arrived from a phone number tied to more than one OPEN negotiation,
+// with no unambiguous label match to route it automatically (see whatsappCloudApi.ts).
+// Held here until an ops user manually assigns it to the right negotiation from the
+// console, rather than ever guessing and risking misattributing it to the wrong deal.
+model WhatsAppUnmatchedMessage {
+  id         String       @id @default(uuid()) @db.Uuid
+  orgId      String       @map("org_id") @db.Uuid
+  org        Organisation @relation(fields: [orgId], references: [id])
+  from       String
+  body       String
+  receivedAt DateTime     @default(now()) @map("received_at")
+
+  @@index([orgId])
+  @@map("whatsapp_unmatched_messages")
 }
 
 model ContractEvent {

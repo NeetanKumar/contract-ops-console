@@ -6,6 +6,9 @@ import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { useOrgEventStream } from "./hooks/useOrgEventStream";
 import { ContractListPage } from "./pages/ContractListPage";
 import { UploadPage } from "./pages/UploadPage";
+import { WhatsAppImportPage } from "./pages/WhatsAppImportPage";
+import { WhatsAppSetupPage } from "./pages/WhatsAppSetupPage";
+import { WhatsAppOnboardingPage } from "./pages/WhatsAppOnboardingPage";
 import { ContractDetailPage } from "./pages/ContractDetailPage";
 
 function Logo() {
@@ -44,6 +47,9 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<ContractListPage />} />
           <Route path="/upload" element={<UploadPage />} />
+          <Route path="/whatsapp-import" element={<WhatsAppImportPage />} />
+          <Route path="/whatsapp-setup" element={<WhatsAppSetupPage />} />
+          <Route path="/whatsapp-onboarding" element={<WhatsAppOnboardingPage />} />
           <Route path="/contracts/:id" element={<ContractDetailPage />} />
         </Routes>
       </main>
